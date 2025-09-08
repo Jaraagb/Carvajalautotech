@@ -1,48 +1,29 @@
-import 'package:equatable/equatable.dart';
+import 'package:carvajal_autotech/features/auth/domain/entities/user_entity.dart';
 
-enum UserRole { admin, student }
-
-class User extends Equatable {
-  final String id;
-  final String email;
-  final String firstName;
-  final String lastName;
-  final UserRole role;
-  final DateTime createdAt;
-  final DateTime? lastLogin;
-
-  const User({
-    required this.id,
-    required this.email,
-    required this.firstName,
-    required this.lastName,
-    required this.role,
-    required this.createdAt,
-    this.lastLogin,
+class UserModel extends UserEntity {
+  const UserModel({
+    required super.id,
+    required super.email,
+    required super.role,
+    super.firstName,
+    super.lastName,
+    super.avatarUrl,
+    super.createdAt,
+    super.isActive,
   });
 
-  String get fullName => '$firstName $lastName';
-
-  bool get isAdmin => role == UserRole.admin;
-  bool get isStudent => role == UserRole.student;
-
-  User copyWith({
-    String? id,
-    String? email,
-    String? firstName,
-    String? lastName,
-    UserRole? role,
-    DateTime? createdAt,
-    DateTime? lastLogin,
-  }) {
-    return User(
-      id: id ?? this.id,
-      email: email ?? this.email,
-      firstName: firstName ?? this.firstName,
-      lastName: lastName ?? this.lastName,
-      role: role ?? this.role,
-      createdAt: createdAt ?? this.createdAt,
-      lastLogin: lastLogin ?? this.lastLogin,
+  factory UserModel.fromJson(Map<String, dynamic> json) {
+    return UserModel(
+      id: json['id'] ?? '',
+      email: json['email'] ?? '',
+      role: _parseRole(json['role']),
+      firstName: json['first_name'],
+      lastName: json['last_name'],
+      avatarUrl: json['avatar_url'],
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'])
+          : null,
+      isActive: json['is_active'] ?? true,
     );
   }
 
@@ -50,88 +31,25 @@ class User extends Equatable {
     return {
       'id': id,
       'email': email,
-      'firstName': firstName,
-      'lastName': lastName,
-      'role': role.name,
-      'createdAt': createdAt.toIso8601String(),
-      'lastLogin': lastLogin?.toIso8601String(),
+      'role': role.toString().split('.').last,
+      'first_name': firstName,
+      'last_name': lastName,
+      'avatar_url': avatarUrl,
+      'created_at': createdAt?.toIso8601String(),
+      'is_active': isActive,
     };
   }
 
-  factory User.fromJson(Map<String, dynamic> json) {
-    return User(
-      id: json['id'] as String,
-      email: json['email'] as String,
-      firstName: json['firstName'] as String,
-      lastName: json['lastName'] as String,
-      role: UserRole.values.firstWhere(
-        (e) => e.name == json['role'],
-        orElse: () => UserRole.student,
-      ),
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      lastLogin: json['lastLogin'] != null
-          ? DateTime.parse(json['lastLogin'] as String)
-          : null,
-    );
+  static UserRole _parseRole(dynamic role) {
+    if (role == null) return UserRole.student;
+
+    switch (role.toString().toLowerCase()) {
+      case 'admin':
+        return UserRole.admin;
+      case 'student':
+        return UserRole.student;
+      default:
+        return UserRole.student;
+    }
   }
-
-  @override
-  List<Object?> get props => [
-        id,
-        email,
-        firstName,
-        lastName,
-        role,
-        createdAt,
-        lastLogin,
-      ];
-}
-
-// Modelo para registro de estudiante
-class StudentRegistration extends Equatable {
-  final String email;
-  final String password;
-  final String firstName;
-  final String lastName;
-
-  const StudentRegistration({
-    required this.email,
-    required this.password,
-    required this.firstName,
-    required this.lastName,
-  });
-
-  Map<String, dynamic> toJson() {
-    return {
-      'email': email,
-      'password': password,
-      'firstName': firstName,
-      'lastName': lastName,
-      'role': UserRole.student.name,
-    };
-  }
-
-  @override
-  List<Object> get props => [email, password, firstName, lastName];
-}
-
-// Modelo para login
-class LoginCredentials extends Equatable {
-  final String email;
-  final String password;
-
-  const LoginCredentials({
-    required this.email,
-    required this.password,
-  });
-
-  Map<String, dynamic> toJson() {
-    return {
-      'email': email,
-      'password': password,
-    };
-  }
-
-  @override
-  List<Object> get props => [email, password];
 }

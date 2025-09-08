@@ -6,18 +6,22 @@ enum QuestionType {
   freeText,
 }
 
-class Category extends Equatable {
+class Category {
   final String id;
   final String name;
   final String description;
   final DateTime createdAt;
+  final int? questionCount;
+  final bool isActive;
   final String createdBy; // ID del admin que la creó
 
-  const Category({
+  Category({
     required this.id,
     required this.name,
-    required this.description,
     required this.createdAt,
+    required this.description,
+    this.questionCount,
+    this.isActive = true,
     required this.createdBy,
   });
 
@@ -42,7 +46,7 @@ class Category extends Equatable {
       'id': id,
       'name': name,
       'description': description,
-      'createdAt': createdAt.toIso8601String(),
+      'createdAt': createdAt?.toIso8601String(),
       'createdBy': createdBy,
     };
   }

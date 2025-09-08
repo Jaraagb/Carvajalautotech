@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:carvajal_autotech/services/auth_service.dart';
+import 'package:carvajal_autotech/features/auth/domain/entities/user_entity.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -17,11 +19,11 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  
+
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
-  
+
   bool _isPasswordVisible = false;
   bool _isLoading = false;
 
@@ -71,18 +73,35 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
       _isLoading = true;
     });
 
-    // Simular llamada API
-    await Future.delayed(const Duration(seconds: 2));
-
-    setState(() {
-      _isLoading = false;
-    });
-
-    // Navegar al dashboard del admin
-    if (mounted) {
-      Navigator.of(context).pushReplacementNamed(
-        AppConstants.adminDashboardRoute,
+    try {
+      final result = await AuthService.signInWithEmailPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+        expectedRole: UserRole.admin,
       );
+
+      if (result.isSuccess && result.user != null) {
+        if (mounted) {
+          Navigator.of(context).pushReplacementNamed(
+            AppConstants.adminDashboardRoute,
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result.error ?? 'Error desconocido'),
+              backgroundColor: AppTheme.primaryRed,
+            ),
+          );
+        }
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -129,9 +148,9 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
                               ),
                             ),
                           ),
-                          
+
                           const SizedBox(height: 20),
-                          
+
                           // Header con diseño especial para admin
                           AnimationConfiguration.staggeredList(
                             position: 1,
@@ -151,7 +170,8 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
                                         borderRadius: BorderRadius.circular(25),
                                         boxShadow: [
                                           BoxShadow(
-                                            color: AppTheme.primaryRed.withOpacity(0.4),
+                                            color: AppTheme.primaryRed
+                                                .withOpacity(0.4),
                                             blurRadius: 20,
                                             offset: const Offset(0, 8),
                                           ),
@@ -163,9 +183,9 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
                                         color: AppTheme.white,
                                       ),
                                     ),
-                                    
+
                                     const SizedBox(height: 32),
-                                    
+
                                     Text(
                                       'Administrador',
                                       style: Theme.of(context)
@@ -176,9 +196,9 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
                                             fontWeight: FontWeight.bold,
                                           ),
                                     ),
-                                    
+
                                     const SizedBox(height: 8),
-                                    
+
                                     Text(
                                       'Acceso exclusivo para administradores del sistema',
                                       style: Theme.of(context)
@@ -188,9 +208,9 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
                                             color: AppTheme.greyLight,
                                           ),
                                     ),
-                                    
+
                                     const SizedBox(height: 16),
-                                    
+
                                     // Badge de seguridad
                                     Container(
                                       padding: const EdgeInsets.symmetric(
@@ -198,10 +218,12 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
                                         vertical: 6,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: AppTheme.primaryRed.withOpacity(0.2),
+                                        color: AppTheme.primaryRed
+                                            .withOpacity(0.2),
                                         borderRadius: BorderRadius.circular(20),
                                         border: Border.all(
-                                          color: AppTheme.primaryRed.withOpacity(0.5),
+                                          color: AppTheme.primaryRed
+                                              .withOpacity(0.5),
                                           width: 1,
                                         ),
                                       ),
@@ -232,9 +254,9 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
                               ),
                             ),
                           ),
-                          
+
                           const SizedBox(height: 50),
-                          
+
                           // Formulario
                           Form(
                             key: _formKey,
@@ -251,8 +273,10 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
                                         controller: _emailController,
                                         label: 'Correo de administrador',
                                         hint: 'admin@sistema.com',
-                                        keyboardType: TextInputType.emailAddress,
-                                        prefixIcon: Icons.admin_panel_settings_outlined,
+                                        keyboardType:
+                                            TextInputType.emailAddress,
+                                        prefixIcon:
+                                            Icons.admin_panel_settings_outlined,
                                         validator: (value) {
                                           if (value?.isEmpty ?? true) {
                                             return 'Ingresa tu correo de administrador';
@@ -266,9 +290,9 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
                                     ),
                                   ),
                                 ),
-                                
+
                                 const SizedBox(height: 24),
-                                
+
                                 // Contraseña
                                 AnimationConfiguration.staggeredList(
                                   position: 3,
@@ -288,14 +312,16 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
                                             : Icons.visibility_outlined,
                                         onSuffixTap: () {
                                           setState(() {
-                                            _isPasswordVisible = !_isPasswordVisible;
+                                            _isPasswordVisible =
+                                                !_isPasswordVisible;
                                           });
                                         },
                                         validator: (value) {
                                           if (value?.isEmpty ?? true) {
                                             return 'Ingresa tu contraseña';
                                           }
-                                          if (value!.length < AppConstants.minPasswordLength) {
+                                          if (value!.length <
+                                              AppConstants.minPasswordLength) {
                                             return 'Contraseña muy corta';
                                           }
                                           return null;
@@ -304,9 +330,9 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
                                     ),
                                   ),
                                 ),
-                                
+
                                 const SizedBox(height: 20),
-                                
+
                                 // Enlace de recuperación
                                 AnimationConfiguration.staggeredList(
                                   position: 4,
@@ -317,9 +343,11 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
                                       child: TextButton(
                                         onPressed: () {
                                           // TODO: Implementar recuperación de contraseña para admin
-                                          ScaffoldMessenger.of(context).showSnackBar(
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
                                             const SnackBar(
-                                              content: Text('Contacta al super administrador para recuperar tu contraseña'),
+                                              content: Text(
+                                                  'Contacta al super administrador para recuperar tu contraseña'),
                                               backgroundColor: AppTheme.warning,
                                             ),
                                           );
@@ -331,16 +359,17 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
                                               .bodyMedium
                                               ?.copyWith(
                                                 color: AppTheme.primaryRed,
-                                                decoration: TextDecoration.underline,
+                                                decoration:
+                                                    TextDecoration.underline,
                                               ),
                                         ),
                                       ),
                                     ),
                                   ),
                                 ),
-                                
+
                                 const SizedBox(height: 40),
-                                
+
                                 // Botón de login
                                 AnimationConfiguration.staggeredList(
                                   position: 5,
@@ -358,9 +387,9 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
                                     ),
                                   ),
                                 ),
-                                
+
                                 const SizedBox(height: 40),
-                                
+
                                 // Advertencia de seguridad
                                 AnimationConfiguration.staggeredList(
                                   position: 6,
@@ -369,10 +398,12 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
                                     child: Container(
                                       padding: const EdgeInsets.all(16),
                                       decoration: BoxDecoration(
-                                        color: AppTheme.warning.withOpacity(0.1),
+                                        color:
+                                            AppTheme.warning.withOpacity(0.1),
                                         borderRadius: BorderRadius.circular(12),
                                         border: Border.all(
-                                          color: AppTheme.warning.withOpacity(0.3),
+                                          color:
+                                              AppTheme.warning.withOpacity(0.3),
                                           width: 1,
                                         ),
                                       ),

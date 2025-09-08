@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:carvajal_autotech/services/auth_service.dart';
+import 'package:carvajal_autotech/features/auth/domain/entities/user_entity.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -17,11 +19,11 @@ class _StudentLoginScreenState extends State<StudentLoginScreen>
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  
+
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
-  
+
   bool _isPasswordVisible = false;
   bool _isLoading = false;
   bool _rememberMe = false;
@@ -72,18 +74,36 @@ class _StudentLoginScreenState extends State<StudentLoginScreen>
       _isLoading = true;
     });
 
-    // Simular llamada API
-    await Future.delayed(const Duration(seconds: 2));
-
-    setState(() {
-      _isLoading = false;
-    });
-
-    // Navegar al dashboard del estudiante
-    if (mounted) {
-      Navigator.of(context).pushReplacementNamed(
-        AppConstants.studentDashboardRoute,
+    try {
+      final result = await AuthService.signInWithEmailPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+        expectedRole: UserRole.student,
+        rememberMe: _rememberMe,
       );
+
+      if (result.isSuccess && result.user != null) {
+        if (mounted) {
+          Navigator.of(context).pushReplacementNamed(
+            AppConstants.studentDashboardRoute,
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result.error ?? 'Error desconocido'),
+              backgroundColor: AppTheme.primaryRed,
+            ),
+          );
+        }
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -130,9 +150,9 @@ class _StudentLoginScreenState extends State<StudentLoginScreen>
                               ),
                             ),
                           ),
-                          
+
                           const SizedBox(height: 20),
-                          
+
                           // Header
                           AnimationConfiguration.staggeredList(
                             position: 1,
@@ -148,14 +168,18 @@ class _StudentLoginScreenState extends State<StudentLoginScreen>
                                       height: 80,
                                       decoration: BoxDecoration(
                                         gradient: LinearGradient(
-                                          colors: [AppTheme.info, AppTheme.info.withOpacity(0.8)],
+                                          colors: [
+                                            AppTheme.info,
+                                            AppTheme.info.withOpacity(0.8)
+                                          ],
                                           begin: Alignment.topLeft,
                                           end: Alignment.bottomRight,
                                         ),
                                         borderRadius: BorderRadius.circular(20),
                                         boxShadow: [
                                           BoxShadow(
-                                            color: AppTheme.info.withOpacity(0.3),
+                                            color:
+                                                AppTheme.info.withOpacity(0.3),
                                             blurRadius: 15,
                                             offset: const Offset(0, 6),
                                           ),
@@ -167,9 +191,7 @@ class _StudentLoginScreenState extends State<StudentLoginScreen>
                                         color: AppTheme.white,
                                       ),
                                     ),
-                                    
                                     const SizedBox(height: 32),
-                                    
                                     Text(
                                       'Estudiante',
                                       style: Theme.of(context)
@@ -180,9 +202,7 @@ class _StudentLoginScreenState extends State<StudentLoginScreen>
                                             fontWeight: FontWeight.bold,
                                           ),
                                     ),
-                                    
                                     const SizedBox(height: 8),
-                                    
                                     Text(
                                       'Inicia sesión para acceder a tus cuestionarios',
                                       style: Theme.of(context)
@@ -197,9 +217,9 @@ class _StudentLoginScreenState extends State<StudentLoginScreen>
                               ),
                             ),
                           ),
-                          
+
                           const SizedBox(height: 40),
-                          
+
                           // Formulario
                           Form(
                             key: _formKey,
@@ -216,7 +236,8 @@ class _StudentLoginScreenState extends State<StudentLoginScreen>
                                         controller: _emailController,
                                         label: 'Correo electrónico',
                                         hint: 'estudiante@email.com',
-                                        keyboardType: TextInputType.emailAddress,
+                                        keyboardType:
+                                            TextInputType.emailAddress,
                                         prefixIcon: Icons.email_outlined,
                                         validator: (value) {
                                           if (value?.isEmpty ?? true) {
@@ -231,9 +252,9 @@ class _StudentLoginScreenState extends State<StudentLoginScreen>
                                     ),
                                   ),
                                 ),
-                                
+
                                 const SizedBox(height: 20),
-                                
+
                                 // Contraseña
                                 AnimationConfiguration.staggeredList(
                                   position: 3,
@@ -253,14 +274,16 @@ class _StudentLoginScreenState extends State<StudentLoginScreen>
                                             : Icons.visibility_outlined,
                                         onSuffixTap: () {
                                           setState(() {
-                                            _isPasswordVisible = !_isPasswordVisible;
+                                            _isPasswordVisible =
+                                                !_isPasswordVisible;
                                           });
                                         },
                                         validator: (value) {
                                           if (value?.isEmpty ?? true) {
                                             return 'Ingresa tu contraseña';
                                           }
-                                          if (value!.length < AppConstants.minPasswordLength) {
+                                          if (value!.length <
+                                              AppConstants.minPasswordLength) {
                                             return 'La contraseña debe tener al menos ${AppConstants.minPasswordLength} caracteres';
                                           }
                                           return null;
@@ -269,9 +292,9 @@ class _StudentLoginScreenState extends State<StudentLoginScreen>
                                     ),
                                   ),
                                 ),
-                                
+
                                 const SizedBox(height: 16),
-                                
+
                                 // Recordar y ¿Olvidaste contraseña?
                                 AnimationConfiguration.staggeredList(
                                   position: 4,
@@ -289,12 +312,14 @@ class _StudentLoginScreenState extends State<StudentLoginScreen>
                                                 value: _rememberMe,
                                                 onChanged: (value) {
                                                   setState(() {
-                                                    _rememberMe = value ?? false;
+                                                    _rememberMe =
+                                                        value ?? false;
                                                   });
                                                 },
                                                 activeColor: AppTheme.info,
                                                 shape: RoundedRectangleBorder(
-                                                  borderRadius: BorderRadius.circular(4),
+                                                  borderRadius:
+                                                      BorderRadius.circular(4),
                                                 ),
                                               ),
                                             ),
@@ -310,16 +335,18 @@ class _StudentLoginScreenState extends State<StudentLoginScreen>
                                             ),
                                           ],
                                         ),
-                                        
+
                                         const Spacer(),
-                                        
+
                                         // ¿Olvidaste contraseña?
                                         TextButton(
                                           onPressed: () {
                                             // TODO: Implementar recuperación de contraseña
-                                            ScaffoldMessenger.of(context).showSnackBar(
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
                                               const SnackBar(
-                                                content: Text('Funcionalidad próximamente'),
+                                                content: Text(
+                                                    'Funcionalidad próximamente'),
                                                 backgroundColor: AppTheme.info,
                                               ),
                                             );
@@ -331,7 +358,8 @@ class _StudentLoginScreenState extends State<StudentLoginScreen>
                                                 .bodyMedium
                                                 ?.copyWith(
                                                   color: AppTheme.info,
-                                                  decoration: TextDecoration.underline,
+                                                  decoration:
+                                                      TextDecoration.underline,
                                                 ),
                                           ),
                                         ),
@@ -339,9 +367,9 @@ class _StudentLoginScreenState extends State<StudentLoginScreen>
                                     ),
                                   ),
                                 ),
-                                
+
                                 const SizedBox(height: 32),
-                                
+
                                 // Botón de login
                                 AnimationConfiguration.staggeredList(
                                   position: 5,
@@ -354,15 +382,18 @@ class _StudentLoginScreenState extends State<StudentLoginScreen>
                                         onPressed: _handleLogin,
                                         isLoading: _isLoading,
                                         gradient: LinearGradient(
-                                          colors: [AppTheme.info, AppTheme.info.withOpacity(0.8)],
+                                          colors: [
+                                            AppTheme.info,
+                                            AppTheme.info.withOpacity(0.8)
+                                          ],
                                         ),
                                       ),
                                     ),
                                   ),
                                 ),
-                                
+
                                 const SizedBox(height: 32),
-                                
+
                                 // Divider
                                 AnimationConfiguration.staggeredList(
                                   position: 6,
@@ -385,7 +416,8 @@ class _StudentLoginScreenState extends State<StudentLoginScreen>
                                           ),
                                         ),
                                         Padding(
-                                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 16),
                                           child: Text(
                                             'o',
                                             style: TextStyle(
@@ -412,16 +444,17 @@ class _StudentLoginScreenState extends State<StudentLoginScreen>
                                     ),
                                   ),
                                 ),
-                                
+
                                 const SizedBox(height: 32),
-                                
+
                                 // Botón de registro
                                 AnimationConfiguration.staggeredList(
                                   position: 7,
                                   duration: const Duration(milliseconds: 600),
                                   child: FadeInAnimation(
                                     child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: [
                                         Text(
                                           '¿No tienes cuenta? ',
