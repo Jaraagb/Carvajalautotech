@@ -19,70 +19,64 @@ class AppRouter {
     switch (settings.name) {
       case AppConstants.splashRoute:
         return _buildRoute(const SplashScreen(), settings);
-        
+
       case AppConstants.loginSelectionRoute:
         return _buildRoute(const LoginSelectionScreen(), settings);
-        
+
       case AppConstants.adminLoginRoute:
         return _buildRoute(const AdminLoginScreen(), settings);
-        
+
       case AppConstants.studentLoginRoute:
         return _buildRoute(const StudentLoginScreen(), settings);
-        
+
       case AppConstants.studentRegisterRoute:
         return _buildRoute(const StudentRegisterScreen(), settings);
-        
+
       case AppConstants.adminDashboardRoute:
         return _buildRoute(const AdminDashboardScreen(), settings);
-        
-      case AppConstants.studentDashboardRoute:
-        return _buildRoute(const StudentDashboardScreen(), settings);
-        
-      case AppConstants.questionsListRoute:
-        return _buildRoute(const QuestionsListScreen(), settings);
-        
+
+      // case AppConstants.studentDashboardRoute:
+      //   return _buildRoute(const StudentDashboardScreen(), settings);
+
+      // case AppConstants.questionsListRoute:
+      //   return _buildRoute(const QuestionsListScreen(), settings);
+
       case AppConstants.createQuestionRoute:
         return _buildRoute(const CreateQuestionScreen(), settings);
-        
+
       case AppConstants.editQuestionRoute:
         final questionId = settings.arguments as String?;
         return _buildRoute(
-          CreateQuestionScreen(questionId: questionId), 
-          settings
-        );
-        
+            CreateQuestionScreen(questionId: questionId), settings);
+
       case AppConstants.categoriesRoute:
         return _buildRoute(const CategoriesScreen(), settings);
-        
-      case AppConstants.statisticsRoute:
-        return _buildRoute(const StatisticsScreen(), settings);
-        
-      case AppConstants.quizRoute:
-        final categoryId = settings.arguments as String?;
-        return _buildRoute(
-          QuizScreen(categoryId: categoryId), 
-          settings
-        );
-        
-      case AppConstants.quizResultRoute:
-        final results = settings.arguments as Map<String, dynamic>?;
-        return _buildRoute(
-          QuizResultScreen(results: results ?? {}), 
-          settings
-        );
-        
+
+      // case AppConstants.statisticsRoute:
+      //   return _buildRoute(const StatisticsScreen(), settings);
+
+      // case AppConstants.quizRoute:
+      //   final categoryId = settings.arguments as String?;
+      //   return _buildRoute(
+      //     QuizScreen(categoryId: categoryId),
+      //     settings
+      //   );
+
+      // case AppConstants.quizResultRoute:
+      //   final results = settings.arguments as Map<String, dynamic>?;
+      //   return _buildRoute(
+      //     QuizResultScreen(results: results ?? {}),
+      //     settings
+      //   );
+
       default:
         return _buildRoute(
-          const ErrorScreen(message: 'Página no encontrada'), 
-          settings
-        );
+            const ErrorScreen(message: 'Página no encontrada'), settings);
     }
   }
 
   static PageRouteBuilder<dynamic> _buildRoute(
-    Widget page, 
-    RouteSettings settings
-  ) {
+      Widget page, RouteSettings settings) {
     return PageRouteBuilder(
       settings: settings,
       pageBuilder: (context, animation, secondaryAnimation) => page,
@@ -149,9 +143,7 @@ class AppRouter {
   }
 
   static void navigateToQuizResult(
-    BuildContext context, 
-    Map<String, dynamic> results
-  ) {
+      BuildContext context, Map<String, dynamic> results) {
     Navigator.of(context).pushReplacementNamed(
       AppConstants.quizResultRoute,
       arguments: results,
@@ -210,16 +202,16 @@ class ErrorScreen extends StatelessWidget {
               Text(
                 '¡Oops!',
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
               ),
               const SizedBox(height: 12),
               Text(
                 message,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Colors.grey[400],
-                ),
+                      color: Colors.grey[400],
+                    ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),

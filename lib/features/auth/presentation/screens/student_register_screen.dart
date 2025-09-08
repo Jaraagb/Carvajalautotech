@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
+import 'package:carvajal_autotech/features/auth/domain/entities/user_entity.dart';
+import 'package:carvajal_autotech/services/auth_service.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../widgets/custom_text_field.dart';
@@ -20,11 +22,11 @@ class _StudentRegisterScreenState extends State<StudentRegisterScreen>
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  
+
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
-  
+
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
   bool _isLoading = false;
@@ -89,25 +91,66 @@ class _StudentRegisterScreenState extends State<StudentRegisterScreen>
       _isLoading = true;
     });
 
-    // Simular llamada API
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      print('Iniciando registro...'); // Debug
+      print('Email: ${_emailController.text.trim()}'); // Debug
 
-    setState(() {
-      _isLoading = false;
-    });
+      final result = await AuthService.signUpStudent(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+        firstName: _firstNameController.text.trim().isEmpty
+            ? null
+            : _firstNameController.text.trim(),
+        lastName: _lastNameController.text.trim().isEmpty
+            ? null
+            : _lastNameController.text.trim(),
+      );
 
-    // Mostrar mensaje de éxito y navegar al login
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('¡Cuenta creada exitosamente!'),
-          backgroundColor: AppTheme.success,
-        ),
-      );
-      
-      Navigator.of(context).pushReplacementNamed(
-        AppConstants.studentLoginRoute,
-      );
+      print('Resultado: ${result.isSuccess}'); // Debug
+      if (!result.isSuccess) {
+        print('Error: ${result.error}'); // Debug
+      }
+
+      if (result.isSuccess) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                  '¡Cuenta creada exitosamente! Revisa tu email para confirmar tu cuenta.'),
+              backgroundColor: AppTheme.success,
+            ),
+          );
+
+          Navigator.of(context).pushReplacementNamed(
+            AppConstants.studentLoginRoute,
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result.error ?? 'Error al crear la cuenta'),
+              backgroundColor: AppTheme.error,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('Exception: $e'); // Debug
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error inesperado: $e'),
+            backgroundColor: AppTheme.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -154,9 +197,9 @@ class _StudentRegisterScreenState extends State<StudentRegisterScreen>
                               ),
                             ),
                           ),
-                          
+
                           const SizedBox(height: 20),
-                          
+
                           // Header
                           AnimationConfiguration.staggeredList(
                             position: 1,
@@ -177,9 +220,7 @@ class _StudentRegisterScreenState extends State<StudentRegisterScreen>
                                             fontWeight: FontWeight.bold,
                                           ),
                                     ),
-                                    
                                     const SizedBox(height: 8),
-                                    
                                     Text(
                                       'Completa los datos para crear tu cuenta de estudiante',
                                       style: Theme.of(context)
@@ -194,9 +235,9 @@ class _StudentRegisterScreenState extends State<StudentRegisterScreen>
                               ),
                             ),
                           ),
-                          
+
                           const SizedBox(height: 40),
-                          
+
                           // Formulario
                           Form(
                             key: _formKey,
@@ -251,9 +292,9 @@ class _StudentRegisterScreenState extends State<StudentRegisterScreen>
                                     ),
                                   ),
                                 ),
-                                
+
                                 const SizedBox(height: 20),
-                                
+
                                 // Email
                                 AnimationConfiguration.staggeredList(
                                   position: 3,
@@ -265,13 +306,16 @@ class _StudentRegisterScreenState extends State<StudentRegisterScreen>
                                         controller: _emailController,
                                         label: 'Correo electrónico',
                                         hint: 'estudiante@email.com',
-                                        keyboardType: TextInputType.emailAddress,
+                                        keyboardType:
+                                            TextInputType.emailAddress,
                                         prefixIcon: Icons.email_outlined,
                                         validator: (value) {
                                           if (value?.isEmpty ?? true) {
                                             return 'Ingresa tu correo electrónico';
                                           }
-                                          if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value!)) {
+                                          if (!RegExp(
+                                                  r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                                              .hasMatch(value!)) {
                                             return 'Ingresa un correo válido';
                                           }
                                           return null;
@@ -280,9 +324,9 @@ class _StudentRegisterScreenState extends State<StudentRegisterScreen>
                                     ),
                                   ),
                                 ),
-                                
+
                                 const SizedBox(height: 20),
-                                
+
                                 // Contraseña
                                 AnimationConfiguration.staggeredList(
                                   position: 4,
@@ -302,14 +346,16 @@ class _StudentRegisterScreenState extends State<StudentRegisterScreen>
                                             : Icons.visibility_outlined,
                                         onSuffixTap: () {
                                           setState(() {
-                                            _isPasswordVisible = !_isPasswordVisible;
+                                            _isPasswordVisible =
+                                                !_isPasswordVisible;
                                           });
                                         },
                                         validator: (value) {
                                           if (value?.isEmpty ?? true) {
                                             return 'Ingresa una contraseña';
                                           }
-                                          if (value!.length < AppConstants.minPasswordLength) {
+                                          if (value!.length <
+                                              AppConstants.minPasswordLength) {
                                             return 'La contraseña debe tener al menos ${AppConstants.minPasswordLength} caracteres';
                                           }
                                           return null;
@@ -318,9 +364,9 @@ class _StudentRegisterScreenState extends State<StudentRegisterScreen>
                                     ),
                                   ),
                                 ),
-                                
+
                                 const SizedBox(height: 20),
-                                
+
                                 // Confirmar Contraseña
                                 AnimationConfiguration.staggeredList(
                                   position: 5,
@@ -333,21 +379,24 @@ class _StudentRegisterScreenState extends State<StudentRegisterScreen>
                                         label: 'Confirmar contraseña',
                                         hint: 'Repite tu contraseña',
                                         isPassword: true,
-                                        isPasswordVisible: _isConfirmPasswordVisible,
+                                        isPasswordVisible:
+                                            _isConfirmPasswordVisible,
                                         prefixIcon: Icons.lock_outlined,
                                         suffixIcon: _isConfirmPasswordVisible
                                             ? Icons.visibility_off_outlined
                                             : Icons.visibility_outlined,
                                         onSuffixTap: () {
                                           setState(() {
-                                            _isConfirmPasswordVisible = !_isConfirmPasswordVisible;
+                                            _isConfirmPasswordVisible =
+                                                !_isConfirmPasswordVisible;
                                           });
                                         },
                                         validator: (value) {
                                           if (value?.isEmpty ?? true) {
                                             return 'Confirma tu contraseña';
                                           }
-                                          if (value != _passwordController.text) {
+                                          if (value !=
+                                              _passwordController.text) {
                                             return 'Las contraseñas no coinciden';
                                           }
                                           return null;
@@ -356,16 +405,17 @@ class _StudentRegisterScreenState extends State<StudentRegisterScreen>
                                     ),
                                   ),
                                 ),
-                                
+
                                 const SizedBox(height: 24),
-                                
+
                                 // Términos y condiciones
                                 AnimationConfiguration.staggeredList(
                                   position: 6,
                                   duration: const Duration(milliseconds: 500),
                                   child: FadeInAnimation(
                                     child: Row(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         SizedBox(
                                           height: 20,
@@ -379,14 +429,16 @@ class _StudentRegisterScreenState extends State<StudentRegisterScreen>
                                             },
                                             activeColor: AppTheme.info,
                                             shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(4),
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
                                             ),
                                           ),
                                         ),
                                         const SizedBox(width: 12),
                                         Expanded(
                                           child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
                                             children: [
                                               Text(
                                                 'Acepto los términos y condiciones y la política de privacidad',
@@ -400,17 +452,22 @@ class _StudentRegisterScreenState extends State<StudentRegisterScreen>
                                               TextButton(
                                                 onPressed: () {
                                                   // TODO: Mostrar términos y condiciones
-                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                  ScaffoldMessenger.of(context)
+                                                      .showSnackBar(
                                                     const SnackBar(
-                                                      content: Text('Términos y condiciones próximamente'),
-                                                      backgroundColor: AppTheme.info,
+                                                      content: Text(
+                                                          'Términos y condiciones próximamente'),
+                                                      backgroundColor:
+                                                          AppTheme.info,
                                                     ),
                                                   );
                                                 },
                                                 style: TextButton.styleFrom(
                                                   padding: EdgeInsets.zero,
                                                   minimumSize: Size.zero,
-                                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                  tapTargetSize:
+                                                      MaterialTapTargetSize
+                                                          .shrinkWrap,
                                                 ),
                                                 child: Text(
                                                   'Leer términos completos',
@@ -419,7 +476,9 @@ class _StudentRegisterScreenState extends State<StudentRegisterScreen>
                                                       .bodySmall
                                                       ?.copyWith(
                                                         color: AppTheme.info,
-                                                        decoration: TextDecoration.underline,
+                                                        decoration:
+                                                            TextDecoration
+                                                                .underline,
                                                       ),
                                                 ),
                                               ),
@@ -430,9 +489,9 @@ class _StudentRegisterScreenState extends State<StudentRegisterScreen>
                                     ),
                                   ),
                                 ),
-                                
+
                                 const SizedBox(height: 32),
-                                
+
                                 // Botón de registro
                                 AnimationConfiguration.staggeredList(
                                   position: 7,
@@ -445,23 +504,27 @@ class _StudentRegisterScreenState extends State<StudentRegisterScreen>
                                         onPressed: _handleRegister,
                                         isLoading: _isLoading,
                                         gradient: LinearGradient(
-                                          colors: [AppTheme.info, AppTheme.info.withOpacity(0.8)],
+                                          colors: [
+                                            AppTheme.info,
+                                            AppTheme.info.withOpacity(0.8)
+                                          ],
                                         ),
                                         icon: Icons.person_add_outlined,
                                       ),
                                     ),
                                   ),
                                 ),
-                                
+
                                 const SizedBox(height: 24),
-                                
+
                                 // Ya tienes cuenta
                                 AnimationConfiguration.staggeredList(
                                   position: 8,
                                   duration: const Duration(milliseconds: 600),
                                   child: FadeInAnimation(
                                     child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: [
                                         Text(
                                           '¿Ya tienes cuenta? ',
@@ -474,7 +537,8 @@ class _StudentRegisterScreenState extends State<StudentRegisterScreen>
                                         ),
                                         TextButton(
                                           onPressed: () {
-                                            Navigator.of(context).pushReplacementNamed(
+                                            Navigator.of(context)
+                                                .pushReplacementNamed(
                                               AppConstants.studentLoginRoute,
                                             );
                                           },

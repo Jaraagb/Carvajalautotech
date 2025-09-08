@@ -1,10 +1,10 @@
+import 'package:carvajal_autotech/features/auth/presentation/widgets/custom_button.dart';
+import 'package:carvajal_autotech/features/auth/presentation/widgets/custom_text_field.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/models/question_models.dart';
-import '../../auth/presentation/widgets/custom_text_field.dart';
-import '../../auth/presentation/widgets/custom_button.dart';
 
 class CreateQuestionScreen extends StatefulWidget {
   final String? questionId;
@@ -174,7 +174,7 @@ class _CreateQuestionScreenState extends State<CreateQuestionScreen>
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(widget.questionId == null 
+          content: Text(widget.questionId == null
               ? 'Pregunta creada exitosamente'
               : 'Pregunta actualizada exitosamente'),
           backgroundColor: AppTheme.success,
@@ -194,7 +194,8 @@ class _CreateQuestionScreenState extends State<CreateQuestionScreen>
         backgroundColor: AppTheme.primaryBlack,
         title: Text(
           isEditing ? 'Editar Pregunta' : 'Crear Pregunta',
-          style: const TextStyle(color: AppTheme.white, fontWeight: FontWeight.w600),
+          style: const TextStyle(
+              color: AppTheme.white, fontWeight: FontWeight.w600),
         ),
         leading: IconButton(
           onPressed: () => Navigator.of(context).pop(),
@@ -353,11 +354,14 @@ class _CreateQuestionScreenState extends State<CreateQuestionScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      widget.questionId == null ? 'Nueva Pregunta' : 'Editar Pregunta',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            color: AppTheme.white,
-                            fontWeight: FontWeight.bold,
-                          ),
+                      widget.questionId == null
+                          ? 'Nueva Pregunta'
+                          : 'Editar Pregunta',
+                      style:
+                          Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                color: AppTheme.white,
+                                fontWeight: FontWeight.bold,
+                              ),
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -398,10 +402,14 @@ class _CreateQuestionScreenState extends State<CreateQuestionScreen>
                   margin: const EdgeInsets.only(right: 8),
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   decoration: BoxDecoration(
-                    color: isSelected ? AppTheme.primaryRed.withOpacity(0.2) : AppTheme.lightBlack,
+                    color: isSelected
+                        ? AppTheme.primaryRed.withOpacity(0.2)
+                        : AppTheme.lightBlack,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: isSelected ? AppTheme.primaryRed : AppTheme.greyDark.withOpacity(0.5),
+                      color: isSelected
+                          ? AppTheme.primaryRed
+                          : AppTheme.greyDark.withOpacity(0.5),
                       width: isSelected ? 2 : 1,
                     ),
                   ),
@@ -409,16 +417,21 @@ class _CreateQuestionScreenState extends State<CreateQuestionScreen>
                     children: [
                       Icon(
                         _getTypeIcon(type),
-                        color: isSelected ? AppTheme.primaryRed : AppTheme.greyLight,
+                        color: isSelected
+                            ? AppTheme.primaryRed
+                            : AppTheme.greyLight,
                         size: 24,
                       ),
                       const SizedBox(height: 8),
                       Text(
                         _getTypeLabel(type),
                         style: TextStyle(
-                          color: isSelected ? AppTheme.primaryRed : AppTheme.greyLight,
+                          color: isSelected
+                              ? AppTheme.primaryRed
+                              : AppTheme.greyLight,
                           fontSize: 12,
-                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                          fontWeight:
+                              isSelected ? FontWeight.w600 : FontWeight.w400,
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -524,7 +537,8 @@ class _CreateQuestionScreenState extends State<CreateQuestionScreen>
             if (_optionControllers.length < AppConstants.maxOptionsCount)
               IconButton(
                 onPressed: _addOption,
-                icon: const Icon(Icons.add_circle_outline, color: AppTheme.primaryRed),
+                icon: const Icon(Icons.add_circle_outline,
+                    color: AppTheme.primaryRed),
               ),
           ],
         ),
@@ -564,7 +578,8 @@ class _CreateQuestionScreenState extends State<CreateQuestionScreen>
                 if (_optionControllers.length > AppConstants.minOptionsCount)
                   IconButton(
                     onPressed: () => _removeOption(index),
-                    icon: const Icon(Icons.remove_circle_outline, color: AppTheme.error),
+                    icon: const Icon(Icons.remove_circle_outline,
+                        color: AppTheme.error),
                   ),
               ],
             ),
@@ -619,12 +634,12 @@ class _CreateQuestionScreenState extends State<CreateQuestionScreen>
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   decoration: BoxDecoration(
-                    color: _correctAnswer == 'Verdadero' 
+                    color: _correctAnswer == 'Verdadero'
                         ? AppTheme.success.withOpacity(0.2)
                         : AppTheme.lightBlack,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: _correctAnswer == 'Verdadero' 
+                      color: _correctAnswer == 'Verdadero'
                           ? AppTheme.success
                           : AppTheme.greyDark.withOpacity(0.5),
                       width: _correctAnswer == 'Verdadero' ? 2 : 1,
@@ -635,7 +650,7 @@ class _CreateQuestionScreenState extends State<CreateQuestionScreen>
                     children: [
                       Icon(
                         Icons.check_circle,
-                        color: _correctAnswer == 'Verdadero' 
+                        color: _correctAnswer == 'Verdadero'
                             ? AppTheme.success
                             : AppTheme.greyLight,
                       ),
@@ -643,7 +658,7 @@ class _CreateQuestionScreenState extends State<CreateQuestionScreen>
                       Text(
                         'Verdadero',
                         style: TextStyle(
-                          color: _correctAnswer == 'Verdadero' 
+                          color: _correctAnswer == 'Verdadero'
                               ? AppTheme.success
                               : AppTheme.greyLight,
                           fontWeight: FontWeight.w600,
@@ -665,12 +680,12 @@ class _CreateQuestionScreenState extends State<CreateQuestionScreen>
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   decoration: BoxDecoration(
-                    color: _correctAnswer == 'Falso' 
+                    color: _correctAnswer == 'Falso'
                         ? AppTheme.error.withOpacity(0.2)
                         : AppTheme.lightBlack,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: _correctAnswer == 'Falso' 
+                      color: _correctAnswer == 'Falso'
                           ? AppTheme.error
                           : AppTheme.greyDark.withOpacity(0.5),
                       width: _correctAnswer == 'Falso' ? 2 : 1,
@@ -681,7 +696,7 @@ class _CreateQuestionScreenState extends State<CreateQuestionScreen>
                     children: [
                       Icon(
                         Icons.cancel,
-                        color: _correctAnswer == 'Falso' 
+                        color: _correctAnswer == 'Falso'
                             ? AppTheme.error
                             : AppTheme.greyLight,
                       ),
@@ -689,7 +704,7 @@ class _CreateQuestionScreenState extends State<CreateQuestionScreen>
                       Text(
                         'Falso',
                         style: TextStyle(
-                          color: _correctAnswer == 'Falso' 
+                          color: _correctAnswer == 'Falso'
                               ? AppTheme.error
                               : AppTheme.greyLight,
                           fontWeight: FontWeight.w600,
@@ -782,7 +797,9 @@ class _CreateQuestionScreenState extends State<CreateQuestionScreen>
     return Column(
       children: [
         CustomButton(
-          text: widget.questionId == null ? 'Crear Pregunta' : 'Actualizar Pregunta',
+          text: widget.questionId == null
+              ? 'Crear Pregunta'
+              : 'Actualizar Pregunta',
           onPressed: _saveQuestion,
           isLoading: _isLoading,
           gradient: AppTheme.primaryGradient,

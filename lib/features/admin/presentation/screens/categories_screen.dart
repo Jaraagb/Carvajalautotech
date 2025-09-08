@@ -1,10 +1,9 @@
+import 'package:carvajal_autotech/features/auth/presentation/widgets/custom_text_field.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/models/question_models.dart';
-import '../../auth/presentation/widgets/custom_text_field.dart';
-import '../../auth/presentation/widgets/custom_button.dart';
 import '../widgets/category_card.dart';
 
 class CategoriesScreen extends StatefulWidget {
@@ -87,11 +86,11 @@ class _CategoriesScreenState extends State<CategoriesScreen>
     setState(() {
       _filteredCategories = _categories.where((category) {
         return category.name.toLowerCase().contains(
-              _searchController.text.toLowerCase(),
-            ) ||
-            category.description.toLowerCase().contains(
-              _searchController.text.toLowerCase(),
-            );
+                  _searchController.text.toLowerCase(),
+                ) ||
+            category.description!.toLowerCase().contains(
+                  _searchController.text.toLowerCase(),
+                );
       }).toList();
     });
   }
@@ -247,8 +246,10 @@ class _CategoriesScreenState extends State<CategoriesScreen>
               child: FadeInAnimation(
                 child: CategoryCard(
                   category: _filteredCategories[index],
-                  onEdit: () => _showEditCategoryDialog(_filteredCategories[index]),
-                  onDelete: () => _showDeleteCategoryDialog(_filteredCategories[index]),
+                  onEdit: () =>
+                      _showEditCategoryDialog(_filteredCategories[index]),
+                  onDelete: () =>
+                      _showDeleteCategoryDialog(_filteredCategories[index]),
                 ),
               ),
             ),
@@ -318,7 +319,8 @@ class _CategoriesScreenState extends State<CategoriesScreen>
   void _showCategoryDialog({Category? category}) {
     final isEditing = category != null;
     final nameController = TextEditingController(text: category?.name ?? '');
-    final descriptionController = TextEditingController(text: category?.description ?? '');
+    final descriptionController =
+        TextEditingController(text: category?.description ?? '');
 
     showDialog(
       context: context,
@@ -389,10 +391,12 @@ class _CategoriesScreenState extends State<CategoriesScreen>
           ),
           ElevatedButton(
             onPressed: () {
-              if (nameController.text.isNotEmpty && descriptionController.text.isNotEmpty) {
+              if (nameController.text.isNotEmpty &&
+                  descriptionController.text.isNotEmpty) {
                 if (isEditing) {
                   // Actualizar categoría existente
-                  final index = _categories.indexWhere((c) => c.id == category!.id);
+                  final index =
+                      _categories.indexWhere((c) => c.id == category!.id);
                   if (index != -1) {
                     _categories[index] = category!.copyWith(
                       name: nameController.text,
@@ -419,15 +423,16 @@ class _CategoriesScreenState extends State<CategoriesScreen>
 
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text(isEditing 
-                        ? 'Categoría actualizada' 
+                    content: Text(isEditing
+                        ? 'Categoría actualizada'
                         : 'Categoría creada'),
                     backgroundColor: AppTheme.success,
                   ),
                 );
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryRed),
+            style:
+                ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryRed),
             child: Text(isEditing ? 'Actualizar' : 'Crear'),
           ),
         ],
@@ -462,7 +467,8 @@ class _CategoriesScreenState extends State<CategoriesScreen>
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.warning_outlined, color: AppTheme.error, size: 20),
+                  const Icon(Icons.warning_outlined,
+                      color: AppTheme.error, size: 20),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Column(
@@ -476,7 +482,7 @@ class _CategoriesScreenState extends State<CategoriesScreen>
                           ),
                         ),
                         Text(
-                          category.description,
+                          category.description ?? '',
                           style: const TextStyle(
                             color: AppTheme.greyLight,
                             fontSize: 12,
@@ -521,4 +527,4 @@ class _CategoriesScreenState extends State<CategoriesScreen>
       ),
     );
   }
-} 
+}
