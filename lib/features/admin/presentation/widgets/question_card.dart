@@ -37,12 +37,34 @@ class QuestionCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ✅ Imagen de la pregunta
+            if (question.imageUrl != null && question.imageUrl!.isNotEmpty) ...[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(
+                  question.imageUrl!,
+                  height: 180,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    height: 180,
+                    width: double.infinity,
+                    color: AppTheme.greyDark,
+                    child: const Icon(Icons.broken_image,
+                        color: AppTheme.greyLight, size: 50),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+
             // Header con tipo y acciones
             Row(
               children: [
                 // Chip del tipo
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: _getTypeColor().withOpacity(0.2),
                     borderRadius: BorderRadius.circular(12),
@@ -71,9 +93,9 @@ class QuestionCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                
+
                 const Spacer(),
-                
+
                 // Botones de acción
                 Row(
                   mainAxisSize: MainAxisSize.min,
@@ -100,9 +122,9 @@ class QuestionCard extends StatelessWidget {
                 ),
               ],
             ),
-            
+
             const SizedBox(height: 12),
-            
+
             // Pregunta
             Text(
               question.question,
@@ -114,9 +136,9 @@ class QuestionCard extends StatelessWidget {
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
             ),
-            
+
             const SizedBox(height: 12),
-            
+
             // Opciones (si aplica)
             if (question.options.isNotEmpty) ...[
               Wrap(
@@ -125,14 +147,15 @@ class QuestionCard extends StatelessWidget {
                 children: question.options.take(3).map((option) {
                   final isCorrect = option == question.correctAnswer;
                   return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: isCorrect 
+                      color: isCorrect
                           ? AppTheme.success.withOpacity(0.2)
                           : AppTheme.greyDark.withOpacity(0.3),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
-                        color: isCorrect 
+                        color: isCorrect
                             ? AppTheme.success.withOpacity(0.5)
                             : AppTheme.greyDark.withOpacity(0.5),
                         width: 1,
@@ -152,9 +175,12 @@ class QuestionCard extends StatelessWidget {
                         Text(
                           option,
                           style: TextStyle(
-                            color: isCorrect ? AppTheme.success : AppTheme.greyLight,
+                            color: isCorrect
+                                ? AppTheme.success
+                                : AppTheme.greyLight,
                             fontSize: 12,
-                            fontWeight: isCorrect ? FontWeight.w600 : FontWeight.w400,
+                            fontWeight:
+                                isCorrect ? FontWeight.w600 : FontWeight.w400,
                           ),
                         ),
                       ],
@@ -188,11 +214,7 @@ class QuestionCard extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(
-                      Icons.check,
-                      size: 12,
-                      color: AppTheme.success,
-                    ),
+                    const Icon(Icons.check, size: 12, color: AppTheme.success),
                     const SizedBox(width: 4),
                     Text(
                       'Respuesta: ${question.correctAnswer}',
@@ -206,16 +228,17 @@ class QuestionCard extends StatelessWidget {
                 ),
               ),
             ],
-            
+
             const SizedBox(height: 16),
-            
+
             // Footer con información adicional
             Row(
               children: [
                 // Tiempo límite
                 if (question.hasTimeLimit) ...[
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
                       color: AppTheme.warning.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(6),
@@ -242,29 +265,7 @@ class QuestionCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                 ],
-                
-                // Categoría
-                Expanded(
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.category_outlined,
-                        size: 12,
-                        color: AppTheme.greyMedium,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        question.categoryId.toUpperCase(),
-                        style: const TextStyle(
-                          color: AppTheme.greyMedium,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                
+
                 // Fecha de creación
                 Text(
                   _getTimeAgo(question.createdAt),

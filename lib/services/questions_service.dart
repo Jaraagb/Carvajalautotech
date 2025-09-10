@@ -112,4 +112,18 @@ class QuestionsService {
       throw Exception('❌ Error inesperado: $e');
     }
   }
+
+  /// Obtener pregunta por ID
+  Future<Question> getQuestionById(String id) async {
+    try {
+      final response =
+          await _client.from('questions').select('*').eq('id', id).single();
+
+      return Question.fromJson(Map<String, dynamic>.from(response));
+    } on PostgrestException catch (e) {
+      throw Exception('❌ Error obteniendo pregunta: ${e.message}');
+    } catch (e) {
+      throw Exception('❌ Error inesperado: $e');
+    }
+  }
 }

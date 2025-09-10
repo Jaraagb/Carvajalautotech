@@ -1,11 +1,14 @@
+import 'package:carvajal_autotech/services/category_service.dart';
+import 'package:carvajal_autotech/services/questions_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/models/question_models.dart';
 import '../widgets/question_card.dart';
 import '../widgets/filter_chip_widget.dart';
-import 'questions_list_screen.dart';
 
 class QuestionsListScreen extends StatefulWidget {
   const QuestionsListScreen({Key? key}) : super(key: key);
@@ -22,78 +25,16 @@ class _QuestionsListScreenState extends State<QuestionsListScreen>
   final TextEditingController _searchController = TextEditingController();
   String _selectedCategory = 'Todas';
   String _selectedType = 'Todos';
+
+  List<Question> _questions = [];
   List<Question> _filteredQuestions = [];
+  List<Category> _categories = [];
+
   bool _isLoading = false;
 
-  // Datos simulados
-  final List<Question> _questions = [
-    Question(
-      id: '1',
-      categoryId: 'math',
-      type: QuestionType.multipleChoice,
-      question: '¿Cuál es el resultado de 2 + 2?',
-      options: ['3', '4', '5', '6'],
-      correctAnswer: '4',
-      timeLimit: 30,
-      createdAt: DateTime.now().subtract(const Duration(days: 1)),
-      updatedAt: DateTime.now().subtract(const Duration(days: 1)),
-      createdBy: 'admin1',
-    ),
-    Question(
-      id: '2',
-      categoryId: 'science',
-      type: QuestionType.trueFalse,
-      question: 'La Tierra es plana',
-      options: ['Verdadero', 'Falso'],
-      correctAnswer: 'Falso',
-      createdAt: DateTime.now().subtract(const Duration(hours: 3)),
-      updatedAt: DateTime.now().subtract(const Duration(hours: 3)),
-      createdBy: 'admin1',
-    ),
-    Question(
-      id: '3',
-      categoryId: 'history',
-      type: QuestionType.freeText,
-      question: '¿En qué año se descubrió América?',
-      options: [],
-      correctAnswer: '1492',
-      timeLimit: 60,
-      createdAt: DateTime.now().subtract(const Duration(hours: 5)),
-      updatedAt: DateTime.now().subtract(const Duration(hours: 5)),
-      createdBy: 'admin1',
-    ),
-    Question(
-      id: '4',
-      categoryId: 'math',
-      type: QuestionType.multipleChoice,
-      question: '¿Cuál es la raíz cuadrada de 16?',
-      options: ['2', '4', '6', '8'],
-      correctAnswer: '4',
-      timeLimit: 25,
-      createdAt: DateTime.now().subtract(const Duration(hours: 8)),
-      updatedAt: DateTime.now().subtract(const Duration(hours: 8)),
-      createdBy: 'admin1',
-    ),
-    Question(
-      id: '5',
-      categoryId: 'science',
-      type: QuestionType.trueFalse,
-      question: 'El agua hierve a 100°C',
-      options: ['Verdadero', 'Falso'],
-      correctAnswer: 'Verdadero',
-      timeLimit: 15,
-      createdAt: DateTime.now().subtract(const Duration(hours: 12)),
-      updatedAt: DateTime.now().subtract(const Duration(hours: 12)),
-      createdBy: 'admin1',
-    ),
-  ];
+  final QuestionsService _questionsService = QuestionsService();
+  final CategoryService _categoryService = CategoryService();
 
-  final List<String> _categories = [
-    'Todas',
-    'Matemáticas',
-    'Ciencias',
-    'Historia'
-  ];
   final List<String> _types = [
     'Todos',
     'Opción Múltiple',
@@ -105,7 +46,7 @@ class _QuestionsListScreenState extends State<QuestionsListScreen>
   void initState() {
     super.initState();
     _initializeAnimations();
-    _filteredQuestions = _questions;
+    _loadData();
   }
 
   void _initializeAnimations() {
@@ -125,6 +66,38 @@ class _QuestionsListScreenState extends State<QuestionsListScreen>
     _animationController.forward();
   }
 
+  Future<void> _loadData() async {
+    setState(() => _isLoading = true);
+    try {
+      final questions = await _questionsService.getQuestions();
+      final categories = await _categoryService.getAllCategories();
+
+      setState(() {
+        _questions = questions;
+        _filteredQuestions = questions;
+        _categories = categories;
+      });
+    } on PostgrestException catch (e) {
+      debugPrint('❌ Error cargando datos (PG): ${e.message}');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error cargando datos: ${e.message}'),
+          backgroundColor: AppTheme.error,
+        ),
+      );
+    } catch (e) {
+      debugPrint('❌ Error cargando datos: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Error inesperado cargando datos'),
+          backgroundColor: AppTheme.error,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   @override
   void dispose() {
     _animationController.dispose();
@@ -135,17 +108,14 @@ class _QuestionsListScreenState extends State<QuestionsListScreen>
   void _filterQuestions() {
     setState(() {
       _filteredQuestions = _questions.where((question) {
-        // Filtro por búsqueda
         final searchMatch = _searchController.text.isEmpty ||
             question.question
                 .toLowerCase()
                 .contains(_searchController.text.toLowerCase());
 
-        // Filtro por categoría
         final categoryMatch = _selectedCategory == 'Todas' ||
-            question.categoryId == _selectedCategory.toLowerCase();
+            _getCategoryName(question.categoryId) == _selectedCategory;
 
-        // Filtro por tipo
         final typeMatch = _selectedType == 'Todos' ||
             _getTypeLabel(question.type) == _selectedType;
 
@@ -165,6 +135,21 @@ class _QuestionsListScreenState extends State<QuestionsListScreen>
     }
   }
 
+  String _getCategoryName(String categoryId) {
+    final cat = _categories.firstWhere(
+      (c) => c.id == categoryId,
+      orElse: () => Category(
+        id: categoryId,
+        name: 'Desconocida',
+        description: '',
+        createdBy: '',
+        createdAt: DateTime.now(),
+        isActive: false,
+      ),
+    );
+    return cat.name;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -177,19 +162,7 @@ class _QuestionsListScreenState extends State<QuestionsListScreen>
             opacity: _fadeAnimation,
             child: Column(
               children: [
-                // Filtros y búsqueda
-                AnimationConfiguration.staggeredList(
-                  position: 0,
-                  duration: const Duration(milliseconds: 600),
-                  child: SlideAnimation(
-                    verticalOffset: -30.0,
-                    child: FadeInAnimation(
-                      child: _buildFiltersSection(),
-                    ),
-                  ),
-                ),
-
-                // Lista de preguntas
+                _buildFiltersSection(),
                 Expanded(
                   child: _isLoading
                       ? const Center(
@@ -206,28 +179,22 @@ class _QuestionsListScreenState extends State<QuestionsListScreen>
           );
         },
       ),
-      floatingActionButton: AnimatedBuilder(
-        animation: _animationController,
-        builder: (context, child) {
-          return ScaleTransition(
-            scale: _fadeAnimation,
-            child: FloatingActionButton.extended(
-              onPressed: () {
-                Navigator.of(context)
-                    .pushNamed(AppConstants.createQuestionRoute);
-              },
-              backgroundColor: AppTheme.primaryRed,
-              icon: const Icon(Icons.add, color: AppTheme.white),
-              label: const Text(
-                'Nueva Pregunta',
-                style: TextStyle(
-                  color: AppTheme.white,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+      floatingActionButton: ScaleTransition(
+        scale: _fadeAnimation,
+        child: FloatingActionButton.extended(
+          onPressed: () {
+            Navigator.of(context).pushNamed(AppConstants.createQuestionRoute);
+          },
+          backgroundColor: AppTheme.primaryRed,
+          icon: const Icon(Icons.add, color: AppTheme.white),
+          label: const Text(
+            'Nueva Pregunta',
+            style: TextStyle(
+              color: AppTheme.white,
+              fontWeight: FontWeight.w600,
             ),
-          );
-        },
+          ),
+        ),
       ),
     );
   }
@@ -245,64 +212,8 @@ class _QuestionsListScreenState extends State<QuestionsListScreen>
       ),
       actions: [
         IconButton(
-          onPressed: () {
-            setState(() {
-              _isLoading = true;
-            });
-            // Simular recarga
-            Future.delayed(const Duration(seconds: 1), () {
-              setState(() {
-                _isLoading = false;
-              });
-            });
-          },
+          onPressed: _loadData,
           icon: const Icon(Icons.refresh, color: AppTheme.white),
-        ),
-        PopupMenuButton<String>(
-          icon: const Icon(Icons.more_vert, color: AppTheme.white),
-          color: AppTheme.lightBlack,
-          onSelected: (value) {
-            switch (value) {
-              case 'export':
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Exportar próximamente'),
-                    backgroundColor: AppTheme.info,
-                  ),
-                );
-                break;
-              case 'import':
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Importar próximamente'),
-                    backgroundColor: AppTheme.info,
-                  ),
-                );
-                break;
-            }
-          },
-          itemBuilder: (context) => [
-            const PopupMenuItem(
-              value: 'export',
-              child: Row(
-                children: [
-                  Icon(Icons.download, color: AppTheme.white),
-                  SizedBox(width: 12),
-                  Text('Exportar', style: TextStyle(color: AppTheme.white)),
-                ],
-              ),
-            ),
-            const PopupMenuItem(
-              value: 'import',
-              child: Row(
-                children: [
-                  Icon(Icons.upload, color: AppTheme.white),
-                  SizedBox(width: 12),
-                  Text('Importar', style: TextStyle(color: AppTheme.white)),
-                ],
-              ),
-            ),
-          ],
         ),
       ],
     );
@@ -313,7 +224,7 @@ class _QuestionsListScreenState extends State<QuestionsListScreen>
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          // Barra de búsqueda
+          // 🔎 Barra de búsqueda
           TextField(
             controller: _searchController,
             onChanged: (value) => _filterQuestions(),
@@ -322,15 +233,6 @@ class _QuestionsListScreenState extends State<QuestionsListScreen>
               hintText: 'Buscar preguntas...',
               hintStyle: const TextStyle(color: AppTheme.greyMedium),
               prefixIcon: const Icon(Icons.search, color: AppTheme.greyMedium),
-              suffixIcon: _searchController.text.isNotEmpty
-                  ? IconButton(
-                      onPressed: () {
-                        _searchController.clear();
-                        _filterQuestions();
-                      },
-                      icon: const Icon(Icons.clear, color: AppTheme.greyMedium),
-                    )
-                  : null,
               filled: true,
               fillColor: AppTheme.lightBlack,
               border: OutlineInputBorder(
@@ -339,73 +241,74 @@ class _QuestionsListScreenState extends State<QuestionsListScreen>
               ),
             ),
           ),
-
           const SizedBox(height: 16),
 
-          // Filtros por chips
+          // 📌 2 columnas: Categorías y Tipos
           Row(
             children: [
+              // 👉 Columna categorías
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Categorías',
-                      style: TextStyle(
-                        color: AppTheme.greyLight,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      children: _categories.map((category) {
-                        return FilterChipWidget(
-                          label: category,
-                          isSelected: _selectedCategory == category,
+                child: Container(
+                  height: 120, // 🔥 ajusta altura visible
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Scrollbar(
+                    thumbVisibility: true,
+                    child: ListView(
+                      children: [
+                        FilterChipWidget(
+                          label: 'Todas',
+                          isSelected: _selectedCategory == 'Todas',
                           onSelected: (selected) {
-                            setState(() {
-                              _selectedCategory = category;
-                            });
+                            setState(() => _selectedCategory = 'Todas');
                             _filterQuestions();
                           },
-                        );
-                      }).toList(),
+                        ),
+                        ..._categories.map((cat) {
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: FilterChipWidget(
+                              label: cat.name,
+                              isSelected: _selectedCategory == cat.name,
+                              onSelected: (selected) {
+                                setState(() => _selectedCategory = cat.name);
+                                _filterQuestions();
+                              },
+                            ),
+                          );
+                        }).toList(),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
-              const SizedBox(width: 16),
+
+              const SizedBox(width: 12),
+
+              // 👉 Columna tipos
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Tipos',
-                      style: TextStyle(
-                        color: AppTheme.greyLight,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
+                child: Container(
+                  height: 120, // 🔥 igual altura
+                  padding: const EdgeInsets.only(left: 8),
+                  child: Scrollbar(
+                    thumbVisibility: true,
+                    child: ListView(
                       children: _types.map((type) {
-                        return FilterChipWidget(
-                          label: type,
-                          isSelected: _selectedType == type,
-                          onSelected: (selected) {
-                            setState(() {
-                              _selectedType = type;
-                            });
-                            _filterQuestions();
-                          },
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: FilterChipWidget(
+                            label: type,
+                            isSelected: _selectedType == type,
+                            onSelected: (selected) {
+                              setState(() {
+                                _selectedType = type;
+                              });
+                              _filterQuestions();
+                            },
+                          ),
                         );
                       }).toList(),
                     ),
-                  ],
+                  ),
                 ),
               ),
             ],
@@ -421,6 +324,7 @@ class _QuestionsListScreenState extends State<QuestionsListScreen>
         padding: const EdgeInsets.all(16),
         itemCount: _filteredQuestions.length,
         itemBuilder: (context, index) {
+          final question = _filteredQuestions[index];
           return AnimationConfiguration.staggeredList(
             position: index,
             duration: const Duration(milliseconds: 500),
@@ -430,15 +334,16 @@ class _QuestionsListScreenState extends State<QuestionsListScreen>
                 child: Padding(
                   padding: const EdgeInsets.only(bottom: 16),
                   child: QuestionCard(
-                    question: _filteredQuestions[index],
+                    question: question,
                     onEdit: () {
                       Navigator.of(context).pushNamed(
                         AppConstants.editQuestionRoute,
-                        arguments: _filteredQuestions[index].id,
+                        arguments: _filteredQuestions[index]
+                            .id, // 👈 ahora sí es un String
                       );
                     },
                     onDelete: () {
-                      _showDeleteDialog(_filteredQuestions[index]);
+                      _showDeleteDialog(question);
                     },
                   ),
                 ),
@@ -451,52 +356,10 @@ class _QuestionsListScreenState extends State<QuestionsListScreen>
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 100,
-            height: 100,
-            decoration: BoxDecoration(
-              color: AppTheme.greyDark.withOpacity(0.3),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Icon(
-              Icons.quiz_outlined,
-              size: 50,
-              color: AppTheme.greyMedium,
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'No se encontraron preguntas',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: AppTheme.white,
-                  fontWeight: FontWeight.w600,
-                ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Ajusta los filtros o crea una nueva pregunta',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppTheme.greyLight,
-                ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 32),
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.of(context).pushNamed(AppConstants.createQuestionRoute);
-            },
-            icon: const Icon(Icons.add),
-            label: const Text('Crear Primera Pregunta'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryRed,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            ),
-          ),
-        ],
+    return const Center(
+      child: Text(
+        'No se encontraron preguntas',
+        style: TextStyle(color: AppTheme.white),
       ),
     );
   }
@@ -510,41 +373,15 @@ class _QuestionsListScreenState extends State<QuestionsListScreen>
           '¿Eliminar Pregunta?',
           style: TextStyle(color: AppTheme.white),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Esta acción no se puede deshacer.',
-              style: TextStyle(color: AppTheme.greyLight),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppTheme.error.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppTheme.error.withOpacity(0.3)),
-              ),
-              child: Text(
-                question.question,
-                style: const TextStyle(
-                  color: AppTheme.white,
-                  fontSize: 14,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
+        content: Text(
+          question.question,
+          style: const TextStyle(color: AppTheme.white),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text(
-              'Cancelar',
-              style: TextStyle(color: AppTheme.greyLight),
-            ),
+            child: const Text('Cancelar',
+                style: TextStyle(color: AppTheme.greyLight)),
           ),
           ElevatedButton(
             onPressed: () {

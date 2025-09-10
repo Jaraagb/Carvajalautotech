@@ -184,6 +184,24 @@ class Question extends Equatable {
       imageUrl: json['image_url'] as String?,
     );
   }
+  factory Question.fromMap(Map<String, dynamic> map) {
+    return Question(
+      id: map['id'].toString(),
+      categoryId: map['category_id'].toString(),
+      type: QuestionTypeExtension.fromString(map['type'].toString()),
+      question: map['question'] ?? '',
+      options: (map['options'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          [],
+      correctAnswer: map['correct_answer'] ?? '',
+      timeLimit: map['time_limit'] as int?,
+      createdAt: DateTime.parse(map['created_at']),
+      updatedAt: DateTime.parse(map['updated_at']),
+      createdBy: map['created_by'].toString(),
+      imageUrl: map['image_url'],
+    );
+  }
 
   @override
   List<Object?> get props => [

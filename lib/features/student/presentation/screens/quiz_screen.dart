@@ -1,36 +1,45 @@
+// lib/features/quiz/presentation/quiz_screen.dart
 import 'dart:async';
+import 'package:carvajal_autotech/services/student_answer_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
+
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/models/question_models.dart';
 import '../../../../core/navigation/app_router.dart';
 import '../../presentation/widgets/custom_button.dart';
+import '../../../../services/questions_service.dart';
 
 class QuizScreen extends StatefulWidget {
   final String? categoryId;
 
-  const QuizScreen({
-    Key? key,
-    this.categoryId,
-  }) : super(key: key);
+  const QuizScreen({Key? key, this.categoryId}) : super(key: key);
 
   @override
   State<QuizScreen> createState() => _QuizScreenState();
 }
 
-class _QuizScreenState extends State<QuizScreen>
-    with TickerProviderStateMixin {
+class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   late AnimationController _animationController;
   late AnimationController _timerController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _progressAnimation;
 
+  final QuestionsService _questionsService = QuestionsService();
+  final StudentAnswersService _answersService = StudentAnswersService();
+
   List<Question> _questions = [];
   int _currentQuestionIndex = 0;
-  Map<String, String> _answers = {};
+  Map<String, String> _answers =
+      {}; // questionId -> answer (persistir selección)
+  Map<String, TextEditingController> _freeTextControllers =
+      {}; // mantener texto libre
   Timer? _questionTimer;
   int _timeRemaining = 0;
+  DateTime? _questionStartTime;
   bool _isAnswered = false;
   bool _isLoading = false;
 
@@ -52,89 +61,89 @@ class _QuizScreenState extends State<QuizScreen>
       vsync: this,
     );
 
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
-    ));
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
 
-    _progressAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _timerController,
-      curve: Curves.linear,
-    ));
+    _progressAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _timerController, curve: Curves.linear),
+    );
 
     _animationController.forward();
   }
 
-  void _loadQuestions() {
-    // Datos simulados de preguntas
-    _questions = [
-      Question(
-        id: '1',
-        categoryId: widget.categoryId ?? 'math',
-        type: QuestionType.multipleChoice,
-        question: '¿Cuál es el resultado de 15 + 27?',
-        options: ['40', '42', '45', '48'],
-        correctAnswer: '42',
-        timeLimit: 30,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-        createdBy: 'admin1',
-      ),
-      Question(
-        id: '2',
-        categoryId: widget.categoryId ?? 'math',
-        type: QuestionType.trueFalse,
-        question: 'El número π (pi) es igual a 3.14159...',
-        options: ['Verdadero', 'Falso'],
-        correctAnswer: 'Verdadero',
-        timeLimit: 20,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-        createdBy: 'admin1',
-      ),
-      Question(
-        id: '3',
-        categoryId: widget.categoryId ?? 'math',
-        type: QuestionType.freeText,
-        question: '¿Cuál es la raíz cuadrada de 64?',
-        options: [],
-        correctAnswer: '8',
-        timeLimit: 25,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-        createdBy: 'admin1',
-      ),
-    ];
+  Future<void> _loadQuestions() async {
+    setState(() => _isLoading = true);
 
-    _startQuestion();
+    try {
+      final response = await Supabase.instance.client
+          .from('unanswered_questions')
+          .select('*')
+          .eq('category_id',
+              widget.categoryId as Object) // siempre aplica filtro
+          .order('created_at', ascending: false);
+
+      final fetchedQuestions =
+          (response as List).map((row) => Question.fromMap(row)).toList();
+
+      setState(() {
+        _questions = fetchedQuestions;
+        _currentQuestionIndex = 0;
+      });
+
+      if (_questions.isNotEmpty) _startQuestion();
+    } catch (e, st) {
+      debugPrint('❌ Error cargando preguntas: $e\n$st');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Error cargando preguntas'),
+          backgroundColor: AppTheme.error,
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   void _startQuestion() {
     if (_currentQuestionIndex < _questions.length) {
       final question = _questions[_currentQuestionIndex];
+
+      // asegurarse de tener controlador para texto libre
+      if (question.type == QuestionType.freeText) {
+        _freeTextControllers.putIfAbsent(
+          question.id,
+          () => TextEditingController(text: _answers[question.id] ?? ''),
+        );
+      }
+
       setState(() {
         _isAnswered = false;
-        _timeRemaining = question.timeLimit ?? 30;
+        _questionStartTime = DateTime.now();
       });
 
-      _startTimer();
+      // Solo iniciar timer si la pregunta tiene timeLimit
+      if (question.timeLimit != null) {
+        setState(() {
+          _timeRemaining = question.timeLimit!;
+        });
+        _startTimer();
+      } else {
+        // cancelar timer si existía
+        _questionTimer?.cancel();
+        _timerController.reset();
+        setState(() => _timeRemaining = 0);
+      }
     }
   }
 
   void _startTimer() {
     _timerController.reset();
     _questionTimer?.cancel();
-    
+
     _questionTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      setState(() {
-        _timeRemaining--;
-      });
+      if (!mounted) return;
+      setState(() => _timeRemaining--);
 
       if (_timeRemaining <= 0) {
         timer.cancel();
@@ -147,24 +156,52 @@ class _QuizScreenState extends State<QuizScreen>
 
   void _handleTimeUp() {
     if (!_isAnswered) {
-      _handleAnswer(''); // Respuesta vacía por tiempo agotado
+      _handleAnswer(''); // respuesta vacía por tiempo agotado
     }
   }
 
-  void _handleAnswer(String answer) {
+  Future<void> _handleAnswer(String answer) async {
     if (_isAnswered) return;
+
+    final question = _questions[_currentQuestionIndex];
 
     setState(() {
       _isAnswered = true;
-      _answers[_questions[_currentQuestionIndex].id] = answer;
+      _answers[question.id] = answer;
     });
 
     _questionTimer?.cancel();
 
-    // Mostrar resultado por 2 segundos antes de continuar
-    Future.delayed(const Duration(seconds: 2), () {
-      _nextQuestion();
-    });
+    final elapsed = _questionStartTime == null
+        ? 0
+        : DateTime.now()
+            .difference(_questionStartTime!)
+            .inSeconds
+            .clamp(0, 999);
+
+    // determinar isCorrect solo por comparación simple (puedes ajustar lógica)
+    final isCorrect = answer.trim().toLowerCase() ==
+        question.correctAnswer.trim().toLowerCase();
+
+    try {
+      await _answersService.saveAnswer(
+        questionId: question.id,
+        answer: answer,
+        isCorrect: isCorrect,
+        timeSpent: elapsed,
+      );
+    } catch (e) {
+      debugPrint('❌ Error guardando respuesta: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error guardando respuesta: $e'),
+          backgroundColor: AppTheme.error,
+        ));
+      }
+    }
+
+    // esperar 1.2s para animación/feedback (no mostrar correct/incorrect here)
+    Future.delayed(const Duration(milliseconds: 1200), _nextQuestion);
   }
 
   void _nextQuestion() {
@@ -179,7 +216,6 @@ class _QuizScreenState extends State<QuizScreen>
   }
 
   void _finishQuiz() {
-    // Calcular resultados
     int correctAnswers = 0;
     for (var question in _questions) {
       final userAnswer = _answers[question.id] ?? '';
@@ -192,7 +228,9 @@ class _QuizScreenState extends State<QuizScreen>
       'totalQuestions': _questions.length,
       'correctAnswers': correctAnswers,
       'incorrectAnswers': _questions.length - correctAnswers,
-      'accuracy': (correctAnswers / _questions.length * 100).round(),
+      'accuracy': (_questions.isEmpty
+          ? 0
+          : (correctAnswers / _questions.length * 100).round()),
       'categoryId': widget.categoryId,
       'answers': _answers,
       'questions': _questions,
@@ -206,17 +244,48 @@ class _QuizScreenState extends State<QuizScreen>
     _animationController.dispose();
     _timerController.dispose();
     _questionTimer?.cancel();
+
+    // dispose controllers
+    for (final c in _freeTextControllers.values) {
+      c.dispose();
+    }
     super.dispose();
+  }
+
+  // Abre la imagen en el navegador (para descargar)
+  Future<void> _openImageUrl(String url) async {
+    try {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('No se pudo abrir la imagen'),
+            backgroundColor: AppTheme.error,
+          ));
+        }
+      }
+    } catch (e) {
+      debugPrint('Error abriendo URL: $e');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: AppTheme.primaryBlack,
+        body: Center(child: CircularProgressIndicator(color: AppTheme.info)),
+      );
+    }
+
     if (_questions.isEmpty) {
       return const Scaffold(
         backgroundColor: AppTheme.primaryBlack,
         body: Center(
-          child: CircularProgressIndicator(color: AppTheme.info),
-        ),
+            child: Text('No hay preguntas disponibles',
+                style: TextStyle(color: AppTheme.white))),
       );
     }
 
@@ -228,61 +297,26 @@ class _QuizScreenState extends State<QuizScreen>
       appBar: _buildAppBar(progress),
       body: AnimatedBuilder(
         animation: _animationController,
-        builder: (context, child) {
-          return FadeTransition(
-            opacity: _fadeAnimation,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: AnimationLimiter(
-                child: Column(
-                  children: [
-                    // Timer y progreso
-                    AnimationConfiguration.staggeredList(
-                      position: 0,
-                      duration: const Duration(milliseconds: 600),
-                      child: SlideAnimation(
-                        verticalOffset: -30.0,
-                        child: FadeInAnimation(
-                          child: _buildTimerSection(),
-                        ),
-                      ),
-                    ),
+        builder: (context, child) => FadeTransition(
+          opacity: _fadeAnimation,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: AnimationLimiter(
+              child: Column(
+                children: [
+                  // Timer (solo si la pregunta tiene timeLimit)
+                  if (currentQuestion.hasTimeLimit) _buildTimerSection(),
+                  if (currentQuestion.hasTimeLimit) const SizedBox(height: 24),
 
-                    const SizedBox(height: 24),
+                  _buildQuestionSection(currentQuestion),
+                  const SizedBox(height: 32),
 
-                    // Pregunta
-                    AnimationConfiguration.staggeredList(
-                      position: 1,
-                      duration: const Duration(milliseconds: 700),
-                      child: SlideAnimation(
-                        verticalOffset: 30.0,
-                        child: FadeInAnimation(
-                          child: _buildQuestionSection(currentQuestion),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 32),
-
-                    // Opciones de respuesta
-                    Expanded(
-                      child: AnimationConfiguration.staggeredList(
-                        position: 2,
-                        duration: const Duration(milliseconds: 800),
-                        child: SlideAnimation(
-                          verticalOffset: 50.0,
-                          child: FadeInAnimation(
-                            child: _buildAnswerSection(currentQuestion),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                  Expanded(child: _buildAnswerSection(currentQuestion)),
+                ],
               ),
             ),
-          );
-        },
+          ),
+        ),
       ),
     );
   }
@@ -292,10 +326,8 @@ class _QuizScreenState extends State<QuizScreen>
       backgroundColor: AppTheme.primaryBlack,
       title: Text(
         'Pregunta ${_currentQuestionIndex + 1} de ${_questions.length}',
-        style: const TextStyle(
-          color: AppTheme.white,
-          fontWeight: FontWeight.w600,
-        ),
+        style:
+            const TextStyle(color: AppTheme.white, fontWeight: FontWeight.w600),
       ),
       leading: IconButton(
         onPressed: () => _showExitDialog(),
@@ -314,12 +346,17 @@ class _QuizScreenState extends State<QuizScreen>
   }
 
   Widget _buildTimerSection() {
+    // Si la pregunta no tiene límite, no mostrar
+    if (_timeRemaining <= 0) {
+      return const SizedBox.shrink();
+    }
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: _timeRemaining <= 10 
+          colors: _timeRemaining <= 10
               ? [AppTheme.error, AppTheme.error.withOpacity(0.8)]
               : [AppTheme.info, AppTheme.info.withOpacity(0.8)],
           begin: Alignment.topLeft,
@@ -328,7 +365,8 @@ class _QuizScreenState extends State<QuizScreen>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: (_timeRemaining <= 10 ? AppTheme.error : AppTheme.info).withOpacity(0.3),
+            color: (_timeRemaining <= 10 ? AppTheme.error : AppTheme.info)
+                .withOpacity(0.3),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
@@ -340,18 +378,17 @@ class _QuizScreenState extends State<QuizScreen>
           Row(
             children: [
               Icon(
-                _timeRemaining <= 10 ? Icons.timer_outlined : Icons.access_time,
-                color: AppTheme.white,
-                size: 24,
-              ),
+                  _timeRemaining <= 10
+                      ? Icons.timer_outlined
+                      : Icons.access_time,
+                  color: AppTheme.white,
+                  size: 24),
               const SizedBox(width: 8),
-              Text(
-                'Tiempo restante',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: AppTheme.white,
-                      fontWeight: FontWeight.w500,
-                    ),
-              ),
+              Text('Tiempo restante',
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: AppTheme.white,
+                        fontWeight: FontWeight.w500,
+                      )),
             ],
           ),
           Container(
@@ -376,19 +413,16 @@ class _QuizScreenState extends State<QuizScreen>
   Widget _buildQuestionSection(Question question) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppTheme.lightBlack,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppTheme.greyDark.withOpacity(0.3),
-          width: 1,
-        ),
+        border: Border.all(color: AppTheme.greyDark.withOpacity(0.3), width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Tipo de pregunta
+          // Tipo
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
@@ -402,35 +436,66 @@ class _QuizScreenState extends State<QuizScreen>
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  _getQuestionTypeIcon(question.type),
-                  color: _getQuestionTypeColor(question.type),
-                  size: 16,
-                ),
+                Icon(_getQuestionTypeIcon(question.type),
+                    color: _getQuestionTypeColor(question.type), size: 16),
                 const SizedBox(width: 6),
-                Text(
-                  _getQuestionTypeLabel(question.type),
-                  style: TextStyle(
-                    color: _getQuestionTypeColor(question.type),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+                Text(_getQuestionTypeLabel(question.type),
+                    style: TextStyle(
+                        color: _getQuestionTypeColor(question.type),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600)),
               ],
             ),
           ),
-          
-          const SizedBox(height: 20),
-          
-          // Pregunta
-          Text(
-            question.question,
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: AppTheme.white,
-                  fontWeight: FontWeight.w600,
-                  height: 1.3,
+
+          const SizedBox(height: 12),
+
+          // Imagen (si existe)
+          if (question.imageUrl != null && question.imageUrl!.isNotEmpty) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.network(
+                question.imageUrl!,
+                height: 180,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (context, _, __) => Container(
+                  height: 180,
+                  color: AppTheme.greyDark,
+                  child: const Center(
+                      child: Icon(Icons.broken_image,
+                          color: AppTheme.greyLight, size: 48)),
                 ),
-          ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                ElevatedButton.icon(
+                  onPressed: () => _openImageUrl(question.imageUrl!),
+                  icon: const Icon(Icons.open_in_new),
+                  label: const Text('Abrir imagen'),
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryRed),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  question.categoryId.toUpperCase(),
+                  style:
+                      const TextStyle(color: AppTheme.greyMedium, fontSize: 12),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+          ],
+
+          // Pregunta texto
+          Text(question.question,
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    color: AppTheme.white,
+                    fontWeight: FontWeight.w600,
+                    height: 1.3,
+                  )),
         ],
       ),
     );
@@ -453,21 +518,11 @@ class _QuizScreenState extends State<QuizScreen>
       itemBuilder: (context, index) {
         final option = question.options[index];
         final isSelected = _answers[question.id] == option;
-        final isCorrect = option == question.correctAnswer;
-        
+
         Color cardColor = AppTheme.lightBlack;
         Color borderColor = AppTheme.greyDark.withOpacity(0.5);
-        Color textColor = AppTheme.white;
-        
-        if (_isAnswered) {
-          if (isCorrect) {
-            cardColor = AppTheme.success.withOpacity(0.2);
-            borderColor = AppTheme.success;
-          } else if (isSelected && !isCorrect) {
-            cardColor = AppTheme.error.withOpacity(0.2);
-            borderColor = AppTheme.error;
-          }
-        } else if (isSelected) {
+
+        if (isSelected) {
           cardColor = AppTheme.info.withOpacity(0.2);
           borderColor = AppTheme.info;
         }
@@ -497,26 +552,24 @@ class _QuizScreenState extends State<QuizScreen>
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(color: borderColor, width: 2),
-                            color: isSelected ? borderColor : Colors.transparent,
+                            color:
+                                isSelected ? borderColor : Colors.transparent,
                           ),
                           child: isSelected
-                              ? const Icon(Icons.check, color: AppTheme.white, size: 16)
+                              ? const Icon(Icons.check,
+                                  color: AppTheme.white, size: 16)
                               : null,
                         ),
                         const SizedBox(width: 16),
                         Expanded(
-                          child: Text(
-                            option,
-                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                  color: textColor,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                          ),
+                          child: Text(option,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyLarge
+                                  ?.copyWith(
+                                      color: AppTheme.white,
+                                      fontWeight: FontWeight.w500)),
                         ),
-                        if (_isAnswered && isCorrect)
-                          const Icon(Icons.check_circle, color: AppTheme.success),
-                        if (_isAnswered && isSelected && !isCorrect)
-                          const Icon(Icons.cancel, color: AppTheme.error),
                       ],
                     ),
                   ),
@@ -534,9 +587,12 @@ class _QuizScreenState extends State<QuizScreen>
       children: [
         Row(
           children: [
-            Expanded(child: _buildTrueFalseOption(question, 'Verdadero', Icons.check_circle)),
+            Expanded(
+                child: _buildTrueFalseOption(
+                    question, 'Verdadero', Icons.check_circle)),
             const SizedBox(width: 16),
-            Expanded(child: _buildTrueFalseOption(question, 'Falso', Icons.cancel)),
+            Expanded(
+                child: _buildTrueFalseOption(question, 'Falso', Icons.cancel)),
           ],
         ),
         const Spacer(),
@@ -544,22 +600,14 @@ class _QuizScreenState extends State<QuizScreen>
     );
   }
 
-  Widget _buildTrueFalseOption(Question question, String option, IconData icon) {
+  Widget _buildTrueFalseOption(
+      Question question, String option, IconData icon) {
     final isSelected = _answers[question.id] == option;
-    final isCorrect = option == question.correctAnswer;
-    
+
     Color cardColor = AppTheme.lightBlack;
     Color borderColor = AppTheme.greyDark.withOpacity(0.5);
-    
-    if (_isAnswered) {
-      if (isCorrect) {
-        cardColor = AppTheme.success.withOpacity(0.2);
-        borderColor = AppTheme.success;
-      } else if (isSelected && !isCorrect) {
-        cardColor = AppTheme.error.withOpacity(0.2);
-        borderColor = AppTheme.error;
-      }
-    } else if (isSelected) {
+
+    if (isSelected) {
       cardColor = AppTheme.info.withOpacity(0.2);
       borderColor = AppTheme.info;
     }
@@ -575,19 +623,11 @@ class _QuizScreenState extends State<QuizScreen>
         ),
         child: Column(
           children: [
-            Icon(
-              icon,
-              color: borderColor,
-              size: 40,
-            ),
+            Icon(icon, color: borderColor, size: 40),
             const SizedBox(height: 12),
-            Text(
-              option,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: AppTheme.white,
-                    fontWeight: FontWeight.w600,
-                  ),
-            ),
+            Text(option,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: AppTheme.white, fontWeight: FontWeight.w600)),
           ],
         ),
       ),
@@ -595,13 +635,13 @@ class _QuizScreenState extends State<QuizScreen>
   }
 
   Widget _buildFreeTextAnswer(Question question) {
-    final textController = TextEditingController();
-    final isAnswered = _answers.containsKey(question.id);
+    final controller = _freeTextControllers.putIfAbsent(question.id,
+        () => TextEditingController(text: _answers[question.id] ?? ''));
 
     return Column(
       children: [
         TextField(
-          controller: textController,
+          controller: controller,
           enabled: !_isAnswered,
           style: const TextStyle(color: AppTheme.white, fontSize: 18),
           decoration: InputDecoration(
@@ -610,92 +650,29 @@ class _QuizScreenState extends State<QuizScreen>
             filled: true,
             fillColor: AppTheme.lightBlack,
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: AppTheme.greyDark.withOpacity(0.5)),
-            ),
+                borderRadius: BorderRadius.circular(12),
+                borderSide:
+                    BorderSide(color: AppTheme.greyDark.withOpacity(0.5))),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppTheme.info, width: 2),
-            ),
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: AppTheme.info, width: 2)),
             contentPadding: const EdgeInsets.all(20),
           ),
         ),
-        
         const SizedBox(height: 24),
-        
         if (!_isAnswered)
           CustomButton(
             text: 'Confirmar Respuesta',
             onPressed: () {
-              if (textController.text.isNotEmpty) {
-                _handleAnswer(textController.text);
-              }
+              final text = controller.text.trim();
+              if (text.isNotEmpty) _handleAnswer(text);
             },
             gradient: LinearGradient(
-              colors: [AppTheme.info, AppTheme.info.withOpacity(0.8)],
-            ),
+                colors: [AppTheme.info, AppTheme.info.withOpacity(0.8)]),
           ),
-        
-        if (_isAnswered) ...[
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: textController.text.toLowerCase() == question.correctAnswer.toLowerCase()
-                  ? AppTheme.success.withOpacity(0.2)
-                  : AppTheme.error.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: textController.text.toLowerCase() == question.correctAnswer.toLowerCase()
-                    ? AppTheme.success
-                    : AppTheme.error,
-              ),
-            ),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      textController.text.toLowerCase() == question.correctAnswer.toLowerCase()
-                          ? Icons.check_circle
-                          : Icons.cancel,
-                      color: textController.text.toLowerCase() == question.correctAnswer.toLowerCase()
-                          ? AppTheme.success
-                          : AppTheme.error,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      textController.text.toLowerCase() == question.correctAnswer.toLowerCase()
-                          ? 'Correcto'
-                          : 'Incorrecto',
-                      style: TextStyle(
-                        color: textController.text.toLowerCase() == question.correctAnswer.toLowerCase()
-                            ? AppTheme.success
-                            : AppTheme.error,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-                if (textController.text.toLowerCase() != question.correctAnswer.toLowerCase()) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    'Respuesta correcta: ${question.correctAnswer}',
-                    style: const TextStyle(
-                      color: AppTheme.white,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-        
-        const Spacer(),
       ],
     );
   }
@@ -738,22 +715,15 @@ class _QuizScreenState extends State<QuizScreen>
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppTheme.lightBlack,
-        title: const Text(
-          '¿Salir del Quiz?',
-          style: TextStyle(color: AppTheme.white),
-        ),
-        content: const Text(
-          'Perderás todo el progreso actual. ¿Estás seguro?',
-          style: TextStyle(color: AppTheme.greyLight),
-        ),
+        title: const Text('¿Salir del Quiz?',
+            style: TextStyle(color: AppTheme.white)),
+        content: const Text('Perderás todo el progreso actual. ¿Estás seguro?',
+            style: TextStyle(color: AppTheme.greyLight)),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text(
-              'Continuar Quiz',
-              style: TextStyle(color: AppTheme.info),
-            ),
-          ),
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Continuar Quiz',
+                  style: TextStyle(color: AppTheme.info))),
           ElevatedButton(
             onPressed: () {
               Navigator.of(context).pop();

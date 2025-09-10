@@ -55,19 +55,13 @@ class AppRouter {
       // case AppConstants.statisticsRoute:
       //   return _buildRoute(const StatisticsScreen(), settings);
 
-      // case AppConstants.quizRoute:
-      //   final categoryId = settings.arguments as String?;
-      //   return _buildRoute(
-      //     QuizScreen(categoryId: categoryId),
-      //     settings
-      //   );
+      case AppConstants.quizRoute:
+        final categoryId = settings.arguments as String?;
+        return _buildRoute(QuizScreen(categoryId: categoryId), settings);
 
-      // case AppConstants.quizResultRoute:
-      //   final results = settings.arguments as Map<String, dynamic>?;
-      //   return _buildRoute(
-      //     QuizResultScreen(results: results ?? {}),
-      //     settings
-      //   );
+      case AppConstants.quizResultRoute:
+        final results = settings.arguments as Map<String, dynamic>?;
+        return _buildRoute(QuizResultScreen(results: results ?? {}), settings);
 
       default:
         return _buildRoute(
