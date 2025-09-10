@@ -1,10 +1,11 @@
-/*import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/models/question_models.dart';
 import '../widgets/question_card.dart';
 import '../widgets/filter_chip_widget.dart';
+import 'questions_list_screen.dart';
 
 class QuestionsListScreen extends StatefulWidget {
   const QuestionsListScreen({Key? key}) : super(key: key);
@@ -17,7 +18,7 @@ class _QuestionsListScreenState extends State<QuestionsListScreen>
     with TickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
-  
+
   final TextEditingController _searchController = TextEditingController();
   String _selectedCategory = 'Todas';
   String _selectedType = 'Todos';
@@ -87,8 +88,18 @@ class _QuestionsListScreenState extends State<QuestionsListScreen>
     ),
   ];
 
-  final List<String> _categories = ['Todas', 'Matemáticas', 'Ciencias', 'Historia'];
-  final List<String> _types = ['Todos', 'Opción Múltiple', 'Verdadero/Falso', 'Texto Libre'];
+  final List<String> _categories = [
+    'Todas',
+    'Matemáticas',
+    'Ciencias',
+    'Historia'
+  ];
+  final List<String> _types = [
+    'Todos',
+    'Opción Múltiple',
+    'Verdadero/Falso',
+    'Texto Libre'
+  ];
 
   @override
   void initState() {
@@ -126,7 +137,9 @@ class _QuestionsListScreenState extends State<QuestionsListScreen>
       _filteredQuestions = _questions.where((question) {
         // Filtro por búsqueda
         final searchMatch = _searchController.text.isEmpty ||
-            question.question.toLowerCase().contains(_searchController.text.toLowerCase());
+            question.question
+                .toLowerCase()
+                .contains(_searchController.text.toLowerCase());
 
         // Filtro por categoría
         final categoryMatch = _selectedCategory == 'Todas' ||
@@ -175,7 +188,7 @@ class _QuestionsListScreenState extends State<QuestionsListScreen>
                     ),
                   ),
                 ),
-                
+
                 // Lista de preguntas
                 Expanded(
                   child: _isLoading
@@ -200,7 +213,8 @@ class _QuestionsListScreenState extends State<QuestionsListScreen>
             scale: _fadeAnimation,
             child: FloatingActionButton.extended(
               onPressed: () {
-                Navigator.of(context).pushNamed(AppConstants.createQuestionRoute);
+                Navigator.of(context)
+                    .pushNamed(AppConstants.createQuestionRoute);
               },
               backgroundColor: AppTheme.primaryRed,
               icon: const Icon(Icons.add, color: AppTheme.white),
@@ -325,9 +339,9 @@ class _QuestionsListScreenState extends State<QuestionsListScreen>
               ),
             ),
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Filtros por chips
           Row(
             children: [
@@ -554,139 +568,3 @@ class _QuestionsListScreenState extends State<QuestionsListScreen>
     );
   }
 }
-                      Navigator.of(context).pushNamed(
-                        AppConstants.editQuestionRoute,
-                        arguments: _filteredQuestions[index].id,
-                      );
-                    },
-                    onDelete: () {
-                      _showDeleteDialog(_filteredQuestions[index]);
-                    },
-                  ),
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 100,
-            height: 100,
-            decoration: BoxDecoration(
-              color: AppTheme.greyDark.withOpacity(0.3),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Icon(
-              Icons.quiz_outlined,
-              size: 50,
-              color: AppTheme.greyMedium,
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'No se encontraron preguntas',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: AppTheme.white,
-                  fontWeight: FontWeight.w600,
-                ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Ajusta los filtros o crea una nueva pregunta',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppTheme.greyLight,
-                ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 32),
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.of(context).pushNamed(AppConstants.createQuestionRoute);
-            },
-            icon: const Icon(Icons.add),
-            label: const Text('Crear Primera Pregunta'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryRed,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showDeleteDialog(Question question) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.lightBlack,
-        title: const Text(
-          '¿Eliminar Pregunta?',
-          style: TextStyle(color: AppTheme.white),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Esta acción no se puede deshacer.',
-              style: TextStyle(color: AppTheme.greyLight),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppTheme.error.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppTheme.error.withOpacity(0.3)),
-              ),
-              child: Text(
-                question.question,
-                style: const TextStyle(
-                  color: AppTheme.white,
-                  fontSize: 14,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text(
-              'Cancelar',
-              style: TextStyle(color: AppTheme.greyLight),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              setState(() {
-                _questions.remove(question);
-                _filterQuestions();
-              });
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Pregunta eliminada'),
-                  backgroundColor: AppTheme.success,
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
-            child: const Text('Eliminar'),
-          ),
-        ],
-      ),
-    );
-  }
-}*/

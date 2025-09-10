@@ -19,8 +19,22 @@ class _CategoryQuizCardState extends State<CategoryQuizCard>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
-  
+
   bool _isPressed = false;
+
+  /// 🔹 Lista de colores para asignar por categoría
+  final List<Color> _categoryColors = [
+    Colors.blue,
+    Colors.green,
+    Colors.purple,
+    Colors.orange,
+    Colors.red,
+    Colors.teal,
+    Colors.indigo,
+    Colors.pink,
+    Colors.amber,
+    Colors.cyan,
+  ];
 
   @override
   void initState() {
@@ -29,7 +43,7 @@ class _CategoryQuizCardState extends State<CategoryQuizCard>
       duration: const Duration(milliseconds: 150),
       vsync: this,
     );
-    
+
     _scaleAnimation = Tween<double>(
       begin: 1.0,
       end: 0.95,
@@ -46,32 +60,43 @@ class _CategoryQuizCardState extends State<CategoryQuizCard>
   }
 
   void _handleTapDown(TapDownDetails details) {
-    setState(() {
-      _isPressed = true;
-    });
+    setState(() => _isPressed = true);
     _animationController.forward();
   }
 
   void _handleTapUp(TapUpDetails details) {
-    setState(() {
-      _isPressed = false;
-    });
+    setState(() => _isPressed = false);
     _animationController.reverse();
     widget.onTap();
   }
 
   void _handleTapCancel() {
-    setState(() {
-      _isPressed = false;
-    });
+    setState(() => _isPressed = false);
     _animationController.reverse();
+  }
+
+  /// 🔹 Función que asegura que el progreso nunca sea NaN o Infinity
+  double _safeProgress(int completed, int total) {
+    if (total <= 0) return 0.0;
+    final progress = completed / total;
+    return progress.clamp(0.0, 1.0);
+  }
+
+  /// 🔹 Obtiene un color en base al nombre de la categoría
+  Color _getCategoryColor(String name) {
+    final index = name.codeUnitAt(0) % _categoryColors.length;
+    return _categoryColors[index];
   }
 
   @override
   Widget build(BuildContext context) {
-    final progress = widget.category['completed'] / widget.category['questionCount'];
+    final name = widget.category['name'] as String;
+    final completed = widget.category['completed'] ?? 0;
+    final questionCount = widget.category['questionCount'] ?? 0;
+    final progress = _safeProgress(completed, questionCount);
     final lastScore = widget.category['lastScore'];
-    final color = widget.category['color'] as Color;
+
+    final color = _getCategoryColor(name);
 
     return AnimatedBuilder(
       animation: _scaleAnimation,
@@ -108,7 +133,7 @@ class _CategoryQuizCardState extends State<CategoryQuizCard>
               ),
               child: Row(
                 children: [
-                  // Icono
+                  // 🔹 Recuadro con la primera letra
                   Container(
                     width: 60,
                     height: 60,
@@ -127,36 +152,42 @@ class _CategoryQuizCardState extends State<CategoryQuizCard>
                         ),
                       ],
                     ),
-                    child: Icon(
-                      widget.category['icon'] as IconData,
-                      color: AppTheme.white,
-                      size: 28,
+                    alignment: Alignment.center,
+                    child: Text(
+                      name.isNotEmpty ? name[0].toUpperCase() : "?",
+                      style: const TextStyle(
+                        color: AppTheme.white,
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
-                  
+
                   const SizedBox(width: 16),
-                  
+
                   // Información
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          widget.category['name'] as String,
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                color: AppTheme.white,
-                                fontWeight: FontWeight.w600,
-                              ),
+                          name,
+                          style:
+                              Theme.of(context).textTheme.titleLarge?.copyWith(
+                                    color: AppTheme.white,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           widget.category['description'] as String,
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: AppTheme.greyLight,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: AppTheme.greyLight,
+                                  ),
                         ),
                         const SizedBox(height: 12),
-                        
+
                         // Progreso
                         Row(
                           children: [
@@ -165,7 +196,7 @@ class _CategoryQuizCardState extends State<CategoryQuizCard>
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Progreso: ${widget.category['completed']}/${widget.category['questionCount']}',
+                                    'Progreso: $completed/$questionCount',
                                     style: const TextStyle(
                                       color: AppTheme.greyLight,
                                       fontSize: 12,
@@ -175,15 +206,17 @@ class _CategoryQuizCardState extends State<CategoryQuizCard>
                                   const SizedBox(height: 4),
                                   LinearProgressIndicator(
                                     value: progress,
-                                    backgroundColor: AppTheme.greyDark.withOpacity(0.3),
-                                    valueColor: AlwaysStoppedAnimation<Color>(color),
+                                    backgroundColor:
+                                        AppTheme.greyDark.withOpacity(0.3),
+                                    valueColor:
+                                        AlwaysStoppedAnimation<Color>(color),
                                     minHeight: 4,
                                   ),
                                 ],
                               ),
                             ),
                             const SizedBox(width: 16),
-                            
+
                             // Última puntuación o botón de comenzar
                             if (lastScore != null) ...[
                               Container(
@@ -192,10 +225,12 @@ class _CategoryQuizCardState extends State<CategoryQuizCard>
                                   vertical: 6,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: _getScoreColor(lastScore).withOpacity(0.2),
+                                  color: _getScoreColor(lastScore)
+                                      .withOpacity(0.2),
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
-                                    color: _getScoreColor(lastScore).withOpacity(0.5),
+                                    color: _getScoreColor(lastScore)
+                                        .withOpacity(0.5),
                                     width: 1,
                                   ),
                                 ),
@@ -235,7 +270,7 @@ class _CategoryQuizCardState extends State<CategoryQuizCard>
                       ],
                     ),
                   ),
-                  
+
                   // Flecha
                   Icon(
                     Icons.arrow_forward_ios,

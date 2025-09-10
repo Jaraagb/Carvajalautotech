@@ -20,7 +20,7 @@ class AdminStatsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isPositive = change.startsWith('+');
-    
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -40,58 +40,55 @@ class AdminStatsCard extends StatelessWidget {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisSize: MainAxisSize.min,
         children: [
           // Header con icono
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  icon,
-                  color: color,
-                  size: 20,
-                ),
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(10),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: isPositive 
-                      ? AppTheme.success.withOpacity(0.2)
-                      : AppTheme.error.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      isPositive ? Icons.trending_up : Icons.trending_down,
-                      size: 12,
+              child: Icon(
+                icon,
+                color: color,
+                size: 20,
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: isPositive
+                    ? AppTheme.success.withOpacity(0.2)
+                    : AppTheme.error.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    isPositive ? Icons.trending_up : Icons.trending_down,
+                    size: 12,
+                    color: isPositive ? AppTheme.success : AppTheme.error,
+                  ),
+                  const SizedBox(width: 2),
+                  Text(
+                    change,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
                       color: isPositive ? AppTheme.success : AppTheme.error,
                     ),
-                    const SizedBox(width: 2),
-                    Text(
-                      change,
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: isPositive ? AppTheme.success : AppTheme.error,
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
-          ),
-          
+            ),
+          ]),
+
           const SizedBox(height: 12),
-          
+
           // Valor principal
           Text(
             value,
@@ -100,9 +97,9 @@ class AdminStatsCard extends StatelessWidget {
                   fontWeight: FontWeight.bold,
                 ),
           ),
-          
+
           const SizedBox(height: 4),
-          
+
           // Título
           Text(
             title,

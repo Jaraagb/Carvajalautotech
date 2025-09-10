@@ -5,6 +5,8 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/navigation/app_router.dart';
 import '../widgets/student_stats_card.dart';
 import '../widgets/category_quiz_card.dart';
+import '../../../../core/models/question_models.dart';
+import '../../../../services/category_service.dart';
 
 class StudentDashboardScreen extends StatefulWidget {
   const StudentDashboardScreen({Key? key}) : super(key: key);
@@ -18,6 +20,14 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
+  // Servicio
+  final CategoryService _categoryService = CategoryService();
+
+  // Estado de categorías
+  List<Category> _categories = [];
+  bool _isLoadingCategories = true;
+  String? _errorCategories;
+
   // Datos simulados del estudiante
   final Map<String, dynamic> _studentStats = {
     'totalAnswered': 45,
@@ -27,53 +37,11 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen>
     'streak': 5,
   };
 
-  final List<Map<String, dynamic>> _availableCategories = [
-    {
-      'id': 'math',
-      'name': 'Matemáticas',
-      'description': 'Álgebra, geometría y más',
-      'questionCount': 25,
-      'completed': 12,
-      'lastScore': 85,
-      'icon': Icons.calculate_outlined,
-      'color': AppTheme.info,
-    },
-    {
-      'id': 'science',
-      'name': 'Ciencias',
-      'description': 'Física, química, biología',
-      'questionCount': 18,
-      'completed': 8,
-      'lastScore': 92,
-      'icon': Icons.science_outlined,
-      'color': AppTheme.success,
-    },
-    {
-      'id': 'history',
-      'name': 'Historia',
-      'description': 'Historia mundial y nacional',
-      'questionCount': 12,
-      'completed': 5,
-      'lastScore': 78,
-      'icon': Icons.history_edu_outlined,
-      'color': AppTheme.warning,
-    },
-    {
-      'id': 'literature',
-      'name': 'Literatura',
-      'description': 'Literatura clásica y contemporánea',
-      'questionCount': 8,
-      'completed': 0,
-      'lastScore': null,
-      'icon': Icons.book_outlined,
-      'color': AppTheme.primaryRed,
-    },
-  ];
-
   @override
   void initState() {
     super.initState();
     _initializeAnimations();
+    _fetchCategories();
   }
 
   void _initializeAnimations() {
@@ -91,6 +59,21 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen>
     ));
 
     _animationController.forward();
+  }
+
+  Future<void> _fetchCategories() async {
+    try {
+      final cats = await _categoryService.getActiveCategories();
+      setState(() {
+        _categories = cats;
+        _isLoadingCategories = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorCategories = "Error cargando categorías";
+        _isLoadingCategories = false;
+      });
+    }
   }
 
   @override
@@ -115,59 +98,13 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Saludo y estadísticas personales
-                    AnimationConfiguration.staggeredList(
-                      position: 0,
-                      duration: const Duration(milliseconds: 600),
-                      child: SlideAnimation(
-                        verticalOffset: -30.0,
-                        child: FadeInAnimation(
-                          child: _buildWelcomeSection(),
-                        ),
-                      ),
-                    ),
-
+                    _buildWelcomeSection(),
                     const SizedBox(height: 24),
-
-                    // Estadísticas del estudiante
-                    AnimationConfiguration.staggeredList(
-                      position: 1,
-                      duration: const Duration(milliseconds: 700),
-                      child: SlideAnimation(
-                        verticalOffset: 30.0,
-                        child: FadeInAnimation(
-                          child: _buildStatsSection(),
-                        ),
-                      ),
-                    ),
-
+                    _buildStatsSection(),
                     const SizedBox(height: 32),
-
-                    // Categorías disponibles
-                    AnimationConfiguration.staggeredList(
-                      position: 2,
-                      duration: const Duration(milliseconds: 800),
-                      child: SlideAnimation(
-                        horizontalOffset: -30.0,
-                        child: FadeInAnimation(
-                          child: _buildCategoriesSection(),
-                        ),
-                      ),
-                    ),
-
+                    _buildCategoriesSection(),
                     const SizedBox(height: 32),
-
-                    // Progreso reciente
-                    AnimationConfiguration.staggeredList(
-                      position: 3,
-                      duration: const Duration(milliseconds: 900),
-                      child: SlideAnimation(
-                        verticalOffset: 30.0,
-                        child: FadeInAnimation(
-                          child: _buildRecentProgressSection(),
-                        ),
-                      ),
-                    ),
+                    _buildRecentProgressSection(),
                   ],
                 ),
               ),
@@ -252,7 +189,8 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen>
                 children: [
                   Icon(Icons.logout, color: AppTheme.error),
                   SizedBox(width: 12),
-                  Text('Cerrar Sesión', style: TextStyle(color: AppTheme.error)),
+                  Text('Cerrar Sesión',
+                      style: TextStyle(color: AppTheme.error)),
                 ],
               ),
             ),
@@ -302,14 +240,15 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen>
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       '¡Hola, Juan!',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            color: AppTheme.white,
-                            fontWeight: FontWeight.bold,
-                          ),
+                      style:
+                          Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                color: AppTheme.white,
+                                fontWeight: FontWeight.bold,
+                              ),
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -326,7 +265,8 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen>
           const SizedBox(height: 16),
           Row(
             children: [
-              const Icon(Icons.local_fire_department, color: AppTheme.white, size: 16),
+              const Icon(Icons.local_fire_department,
+                  color: AppTheme.white, size: 16),
               const SizedBox(width: 4),
               Text(
                 'Racha de ${_studentStats['streak']} días',
@@ -394,7 +334,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen>
 
   Widget _buildCategoriesSection() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
         Text(
           'Categorías Disponibles',
@@ -404,25 +344,50 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen>
               ),
         ),
         const SizedBox(height: 16),
-        ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: _availableCategories.length,
-          itemBuilder: (context, index) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: CategoryQuizCard(
-                category: _availableCategories[index],
-                onTap: () {
-                  Navigator.of(context).pushNamed(
-                    AppConstants.quizRoute,
-                    arguments: _availableCategories[index]['id'],
-                  );
-                },
-              ),
-            );
-          },
-        ),
+        if (_isLoadingCategories)
+          const Center(
+            child: CircularProgressIndicator(color: AppTheme.info),
+          )
+        else if (_errorCategories != null)
+          Text(
+            _errorCategories!,
+            style: const TextStyle(color: AppTheme.error),
+          )
+        else if (_categories.isEmpty)
+          const Text(
+            "No hay categorías disponibles",
+            style: TextStyle(color: AppTheme.greyLight),
+          )
+        else
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _categories.length,
+            itemBuilder: (context, index) {
+              final cat = _categories[index];
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: CategoryQuizCard(
+                  category: {
+                    'id': cat.id,
+                    'name': cat.name,
+                    'description': cat.description,
+                    'questionCount': 0, // TODO: traer desde Supabase
+                    'completed': 0, // TODO: progreso real
+                    'lastScore': null, // TODO: historial real
+                    'icon': Icons.category,
+                    'color': AppTheme.info,
+                  },
+                  onTap: () {
+                    Navigator.of(context).pushNamed(
+                      AppConstants.quizRoute,
+                      arguments: cat.id,
+                    );
+                  },
+                ),
+              );
+            },
+          ),
       ],
     );
   }
@@ -539,7 +504,8 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: _getScoreColor(activity['score'] as int).withOpacity(0.2),
+                color:
+                    _getScoreColor(activity['score'] as int).withOpacity(0.2),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(

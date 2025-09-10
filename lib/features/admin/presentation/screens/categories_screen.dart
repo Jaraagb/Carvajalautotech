@@ -1,6 +1,8 @@
-import 'package:carvajal_autotech/features/auth/presentation/widgets/custom_text_field.dart';
+import 'package:carvajal_autotech/services/category_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/models/question_models.dart';
@@ -19,6 +21,8 @@ class _CategoriesScreenState extends State<CategoriesScreen>
   late Animation<double> _fadeAnimation;
 
   final TextEditingController _searchController = TextEditingController();
+  final CategoryService _categoryService = CategoryService(); // 👈 Servicio
+
   List<Category> _categories = [];
   List<Category> _filteredCategories = [];
   bool _isLoading = false;
@@ -47,39 +51,16 @@ class _CategoriesScreenState extends State<CategoriesScreen>
     _animationController.forward();
   }
 
-  void _loadCategories() {
-    // Datos simulados
-    _categories = [
-      Category(
-        id: 'math',
-        name: 'Matemáticas',
-        description: 'Álgebra, geometría, cálculo y más',
-        createdAt: DateTime.now().subtract(const Duration(days: 30)),
-        createdBy: 'admin1',
-      ),
-      Category(
-        id: 'science',
-        name: 'Ciencias',
-        description: 'Física, química, biología',
-        createdAt: DateTime.now().subtract(const Duration(days: 25)),
-        createdBy: 'admin1',
-      ),
-      Category(
-        id: 'history',
-        name: 'Historia',
-        description: 'Historia mundial y nacional',
-        createdAt: DateTime.now().subtract(const Duration(days: 20)),
-        createdBy: 'admin1',
-      ),
-      Category(
-        id: 'literature',
-        name: 'Literatura',
-        description: 'Literatura clásica y contemporánea',
-        createdAt: DateTime.now().subtract(const Duration(days: 15)),
-        createdBy: 'admin1',
-      ),
-    ];
-    _filteredCategories = List.from(_categories);
+  Future<void> _loadCategories() async {
+    setState(() => _isLoading = true);
+
+    final categories = await _categoryService.getAllCategories();
+
+    setState(() {
+      _categories = categories;
+      _filteredCategories = categories;
+      _isLoading = false;
+    });
   }
 
   void _filterCategories() {
@@ -88,7 +69,7 @@ class _CategoriesScreenState extends State<CategoriesScreen>
         return category.name.toLowerCase().contains(
                   _searchController.text.toLowerCase(),
                 ) ||
-            category.description!.toLowerCase().contains(
+            category.description.toLowerCase().contains(
                   _searchController.text.toLowerCase(),
                 );
       }).toList();
@@ -114,19 +95,7 @@ class _CategoriesScreenState extends State<CategoriesScreen>
             opacity: _fadeAnimation,
             child: Column(
               children: [
-                // Búsqueda
-                AnimationConfiguration.staggeredList(
-                  position: 0,
-                  duration: const Duration(milliseconds: 600),
-                  child: SlideAnimation(
-                    verticalOffset: -30.0,
-                    child: FadeInAnimation(
-                      child: _buildSearchSection(),
-                    ),
-                  ),
-                ),
-
-                // Lista de categorías
+                _buildSearchSection(),
                 Expanded(
                   child: _isLoading
                       ? const Center(
@@ -143,25 +112,17 @@ class _CategoriesScreenState extends State<CategoriesScreen>
           );
         },
       ),
-      floatingActionButton: AnimatedBuilder(
-        animation: _animationController,
-        builder: (context, child) {
-          return ScaleTransition(
-            scale: _fadeAnimation,
-            child: FloatingActionButton.extended(
-              onPressed: () => _showCreateCategoryDialog(),
-              backgroundColor: AppTheme.primaryRed,
-              icon: const Icon(Icons.add, color: AppTheme.white),
-              label: const Text(
-                'Nueva Categoría',
-                style: TextStyle(
-                  color: AppTheme.white,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          );
-        },
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _showCreateCategoryDialog(),
+        backgroundColor: AppTheme.primaryRed,
+        icon: const Icon(Icons.add, color: AppTheme.white),
+        label: const Text(
+          'Nueva Categoría',
+          style: TextStyle(
+            color: AppTheme.white,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ),
     );
   }
@@ -173,22 +134,9 @@ class _CategoriesScreenState extends State<CategoriesScreen>
         'Categorías',
         style: TextStyle(color: AppTheme.white, fontWeight: FontWeight.w600),
       ),
-      leading: IconButton(
-        onPressed: () => Navigator.of(context).pop(),
-        icon: const Icon(Icons.arrow_back_ios, color: AppTheme.white),
-      ),
       actions: [
         IconButton(
-          onPressed: () {
-            setState(() {
-              _isLoading = true;
-            });
-            Future.delayed(const Duration(seconds: 1), () {
-              setState(() {
-                _isLoading = false;
-              });
-            });
-          },
+          onPressed: _loadCategories,
           icon: const Icon(Icons.refresh, color: AppTheme.white),
         ),
       ],
@@ -206,15 +154,6 @@ class _CategoriesScreenState extends State<CategoriesScreen>
           hintText: 'Buscar categorías...',
           hintStyle: const TextStyle(color: AppTheme.greyMedium),
           prefixIcon: const Icon(Icons.search, color: AppTheme.greyMedium),
-          suffixIcon: _searchController.text.isNotEmpty
-              ? IconButton(
-                  onPressed: () {
-                    _searchController.clear();
-                    _filterCategories();
-                  },
-                  icon: const Icon(Icons.clear, color: AppTheme.greyMedium),
-                )
-              : null,
           filled: true,
           fillColor: AppTheme.lightBlack,
           border: OutlineInputBorder(
@@ -238,21 +177,11 @@ class _CategoriesScreenState extends State<CategoriesScreen>
         ),
         itemCount: _filteredCategories.length,
         itemBuilder: (context, index) {
-          return AnimationConfiguration.staggeredGrid(
-            position: index,
-            duration: const Duration(milliseconds: 500),
-            columnCount: 2,
-            child: ScaleAnimation(
-              child: FadeInAnimation(
-                child: CategoryCard(
-                  category: _filteredCategories[index],
-                  onEdit: () =>
-                      _showEditCategoryDialog(_filteredCategories[index]),
-                  onDelete: () =>
-                      _showDeleteCategoryDialog(_filteredCategories[index]),
-                ),
-              ),
-            ),
+          return CategoryCard(
+            category: _filteredCategories[index],
+            onEdit: () => _showEditCategoryDialog(_filteredCategories[index]),
+            onDelete: () =>
+                _showDeleteCategoryDialog(_filteredCategories[index]),
           );
         },
       ),
@@ -260,53 +189,15 @@ class _CategoriesScreenState extends State<CategoriesScreen>
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 100,
-            height: 100,
-            decoration: BoxDecoration(
-              color: AppTheme.greyDark.withOpacity(0.3),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Icon(
-              Icons.category_outlined,
-              size: 50,
-              color: AppTheme.greyMedium,
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'No se encontraron categorías',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: AppTheme.white,
-                  fontWeight: FontWeight.w600,
-                ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Crea tu primera categoría para organizar las preguntas',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppTheme.greyLight,
-                ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 32),
-          ElevatedButton.icon(
-            onPressed: () => _showCreateCategoryDialog(),
-            icon: const Icon(Icons.add),
-            label: const Text('Crear Primera Categoría'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryRed,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            ),
-          ),
-        ],
+    return const Center(
+      child: Text(
+        'No hay categorías',
+        style: TextStyle(color: AppTheme.white),
       ),
     );
   }
+
+  /// ----------- DIÁLOGOS -----------------
 
   void _showCreateCategoryDialog() {
     _showCategoryDialog();
@@ -326,113 +217,46 @@ class _CategoriesScreenState extends State<CategoriesScreen>
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppTheme.lightBlack,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
+        title: Text(isEditing ? 'Editar Categoría' : 'Nueva Categoría'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                gradient: AppTheme.primaryGradient,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(
-                Icons.category_outlined,
-                color: AppTheme.white,
-                size: 20,
-              ),
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(labelText: 'Nombre'),
             ),
-            const SizedBox(width: 12),
-            Text(
-              isEditing ? 'Editar Categoría' : 'Nueva Categoría',
-              style: const TextStyle(color: AppTheme.white),
+            TextField(
+              controller: descriptionController,
+              decoration: const InputDecoration(labelText: 'Descripción'),
             ),
           ],
-        ),
-        content: SizedBox(
-          width: MediaQuery.of(context).size.width * 0.8,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CustomTextField(
-                controller: nameController,
-                label: 'Nombre de la categoría',
-                hint: 'Ej: Matemáticas',
-                validator: (value) {
-                  if (value?.isEmpty ?? true) {
-                    return 'El nombre es obligatorio';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              CustomTextField(
-                controller: descriptionController,
-                label: 'Descripción',
-                hint: 'Breve descripción de la categoría',
-                maxLines: 3,
-                validator: (value) {
-                  if (value?.isEmpty ?? true) {
-                    return 'La descripción es obligatoria';
-                  }
-                  return null;
-                },
-              ),
-            ],
-          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text(
-              'Cancelar',
-              style: TextStyle(color: AppTheme.greyLight),
-            ),
+            child: const Text('Cancelar'),
           ),
           ElevatedButton(
-            onPressed: () {
-              if (nameController.text.isNotEmpty &&
-                  descriptionController.text.isNotEmpty) {
-                if (isEditing) {
-                  // Actualizar categoría existente
-                  final index =
-                      _categories.indexWhere((c) => c.id == category!.id);
-                  if (index != -1) {
-                    _categories[index] = category!.copyWith(
-                      name: nameController.text,
-                      description: descriptionController.text,
-                    );
-                  }
-                } else {
-                  // Crear nueva categoría
-                  final newCategory = Category(
-                    id: DateTime.now().millisecondsSinceEpoch.toString(),
-                    name: nameController.text,
-                    description: descriptionController.text,
-                    createdAt: DateTime.now(),
-                    createdBy: 'admin1',
-                  );
-                  _categories.add(newCategory);
-                }
-
-                setState(() {
-                  _filterCategories();
-                });
-
-                Navigator.of(context).pop();
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(isEditing
-                        ? 'Categoría actualizada'
-                        : 'Categoría creada'),
-                    backgroundColor: AppTheme.success,
-                  ),
+            onPressed: () async {
+              if (isEditing) {
+                await _categoryService.updateCategory(
+                  categoryId: category!.id,
+                  name: nameController.text,
+                  description: descriptionController.text,
+                );
+              } else {
+                final userId =
+                    Supabase.instance.client.auth.currentUser?.id ?? '';
+                await _categoryService.createCategory(
+                  name: nameController.text,
+                  description: descriptionController.text,
+                  createdBy: userId,
                 );
               }
+
+              Navigator.of(context).pop();
+              _loadCategories(); // 👈 refresca lista
             },
-            style:
-                ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryRed),
             child: Text(isEditing ? 'Actualizar' : 'Crear'),
           ),
         ],
@@ -445,82 +269,21 @@ class _CategoriesScreenState extends State<CategoriesScreen>
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppTheme.lightBlack,
-        title: const Text(
-          '¿Eliminar Categoría?',
-          style: TextStyle(color: AppTheme.white),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Esta acción eliminará la categoría y TODAS las preguntas asociadas.',
-              style: TextStyle(color: AppTheme.greyLight),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppTheme.error.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppTheme.error.withOpacity(0.3)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.warning_outlined,
-                      color: AppTheme.error, size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          category.name,
-                          style: const TextStyle(
-                            color: AppTheme.white,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        Text(
-                          category.description ?? '',
-                          style: const TextStyle(
-                            color: AppTheme.greyLight,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+        title: const Text('¿Eliminar Categoría?'),
+        content: Text(
+          'Esto eliminará la categoría y todas sus preguntas asociadas.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text(
-              'Cancelar',
-              style: TextStyle(color: AppTheme.greyLight),
-            ),
+            child: const Text('Cancelar'),
           ),
           ElevatedButton(
-            onPressed: () {
-              setState(() {
-                _categories.removeWhere((c) => c.id == category.id);
-                _filterCategories();
-              });
-
+            onPressed: () async {
+              await _categoryService.deleteCategory(category.id);
               Navigator.of(context).pop();
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Categoría eliminada'),
-                  backgroundColor: AppTheme.success,
-                ),
-              );
+              _loadCategories();
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
             child: const Text('Eliminar'),
           ),
         ],

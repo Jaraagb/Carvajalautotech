@@ -35,11 +35,11 @@ class AppRouter {
       case AppConstants.adminDashboardRoute:
         return _buildRoute(const AdminDashboardScreen(), settings);
 
-      // case AppConstants.studentDashboardRoute:
-      //   return _buildRoute(const StudentDashboardScreen(), settings);
+      case AppConstants.studentDashboardRoute:
+        return _buildRoute(const StudentDashboardScreen(), settings);
 
-      // case AppConstants.questionsListRoute:
-      //   return _buildRoute(const QuestionsListScreen(), settings);
+      case AppConstants.questionsListRoute:
+        return _buildRoute(const QuestionsListScreen(), settings);
 
       case AppConstants.createQuestionRoute:
         return _buildRoute(const CreateQuestionScreen(), settings);

@@ -111,7 +111,6 @@ class _CategoryCardState extends State<CategoryCard>
   }
 
   Color _getCategoryColor() {
-    // Puedes personalizar esto según tu lógica de colores por categoría
     final colorIndex = widget.category.name.hashCode % 4;
     switch (colorIndex.abs()) {
       case 0:
@@ -128,27 +127,8 @@ class _CategoryCardState extends State<CategoryCard>
   }
 
   IconData _getCategoryIcon() {
-    // Puedes personalizar esto según el tipo de categoría
-    final name = widget.category.name.toLowerCase();
-    if (name.contains('matemática') || name.contains('math')) {
-      return Icons.calculate_outlined;
-    } else if (name.contains('ciencia') || name.contains('science')) {
-      return Icons.science_outlined;
-    } else if (name.contains('historia') || name.contains('history')) {
-      return Icons.history_edu_outlined;
-    } else if (name.contains('geografía') || name.contains('geography')) {
-      return Icons.public_outlined;
-    } else if (name.contains('literatura') || name.contains('language')) {
-      return Icons.menu_book_outlined;
-    } else if (name.contains('arte') || name.contains('art')) {
-      return Icons.palette_outlined;
-    } else if (name.contains('música') || name.contains('music')) {
-      return Icons.music_note_outlined;
-    } else if (name.contains('deporte') || name.contains('sport')) {
-      return Icons.sports_outlined;
-    } else {
-      return Icons.category_outlined;
-    }
+    // Método mantenido para compatibilidad, pero ya no se usa
+    return Icons.category_outlined;
   }
 
   @override
@@ -171,8 +151,9 @@ class _CategoryCardState extends State<CategoryCard>
                 onTapUp: _onTapUp,
                 onTapCancel: _onTapCancel,
                 onTap: widget.onTap,
+                // Dentro del build:
                 child: Container(
-                  height: 180,
+                  // ❌ Eliminé el height fijo (200)
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
@@ -215,172 +196,117 @@ class _CategoryCardState extends State<CategoryCard>
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(16),
-                    child: Stack(
-                      children: [
-                        // Efecto de brillo sutil
-                        Positioned(
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          height: 60,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [
-                                  Colors.white.withOpacity(0.05),
-                                  Colors.white.withOpacity(0.0),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                        // Contenido principal
-                        Padding(
-                          padding: const EdgeInsets.all(20),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // HEADER
+                          Row(
                             children: [
-                              // Header con ícono y acciones
-                              Row(
-                                children: [
-                                  // Ícono de categoría
-                                  Container(
-                                    width: 48,
-                                    height: 48,
-                                    decoration: BoxDecoration(
-                                      color: categoryColor.withOpacity(0.15),
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: categoryColor.withOpacity(0.3),
-                                        width: 1,
-                                      ),
-                                    ),
-                                    child: Icon(
-                                      categoryIcon,
+                              Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: categoryColor.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: categoryColor.withOpacity(0.3),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    widget.category.name.isNotEmpty
+                                        ? widget.category.name[0].toUpperCase()
+                                        : '?',
+                                    style: TextStyle(
                                       color: categoryColor,
-                                      size: 24,
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                  const Spacer(),
-                                  // Botones de acción
-                                  if (widget.showActions) ...[
-                                    _ActionButton(
-                                      icon: Icons.edit_outlined,
-                                      color: infoColor,
-                                      onPressed: widget.onEdit,
-                                      tooltip: 'Editar',
-                                    ),
-                                    const SizedBox(width: 8),
-                                    _ActionButton(
-                                      icon: Icons.delete_outline,
-                                      color: const Color(0xFFEF4444),
-                                      onPressed: widget.onDelete,
-                                      tooltip: 'Eliminar',
-                                    ),
-                                  ],
-                                ],
-                              ),
-                              const SizedBox(height: 16),
-                              // Nombre de la categoría
-                              Text(
-                                widget.category.name,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 0.5,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 8),
-                              // Descripción
-                              Expanded(
-                                child: Text(
-                                  widget.category.description ??
-                                      'Sin descripción',
-                                  style: TextStyle(
-                                    color: Colors.grey[400],
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w400,
-                                    height: 1.4,
-                                  ),
-                                  maxLines: 3,
-                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              const SizedBox(height: 12),
-                              // Footer con estadísticas
-                              Row(
-                                children: [
-                                  _StatItem(
-                                    icon: Icons.quiz_outlined,
-                                    value:
-                                        '${widget.category.questionCount ?? 0}',
-                                    label: 'Preguntas',
-                                    color: categoryColor,
-                                  ),
-                                  if (widget.category.createdAt != null) ...[
-                                    const SizedBox(width: 16),
-                                    _StatItem(
-                                      icon: Icons.schedule_outlined,
-                                      value: _formatDate(
-                                          widget.category.createdAt),
-                                      label: 'Creada',
-                                      color: Colors.grey[500]!,
-                                    ),
-                                  ],
-                                ],
-                              ),
+                              const Spacer(),
+                              if (widget.showActions) ...[
+                                _ActionButton(
+                                  icon: Icons.edit_outlined,
+                                  color: infoColor,
+                                  onPressed: widget.onEdit,
+                                  tooltip: 'Editar',
+                                ),
+                                const SizedBox(width: 6),
+                                _ActionButton(
+                                  icon: Icons.delete_outline,
+                                  color: const Color(0xFFEF4444),
+                                  onPressed: widget.onDelete,
+                                  tooltip: 'Eliminar',
+                                ),
+                              ],
                             ],
                           ),
-                        ),
-                        // Ripple effect
-                        Positioned.fill(
-                          child: Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(16),
-                              splashColor: categoryColor.withOpacity(0.1),
-                              highlightColor: categoryColor.withOpacity(0.05),
-                              onTap:
-                                  null, // El tap se maneja en el GestureDetector
+
+                          const SizedBox(height: 12),
+
+                          // NOMBRE
+                          Text(
+                            widget.category.name,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                        // Línea decorativa inferior
-                        Positioned(
-                          bottom: 0,
-                          left: 0,
-                          right: 0,
-                          height: 4,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.centerLeft,
-                                end: Alignment.centerRight,
-                                colors: [
-                                  Colors.transparent,
-                                  categoryColor.withOpacity(0.8),
-                                  Colors.transparent,
-                                ],
+
+                          const SizedBox(height: 6),
+
+                          // DESCRIPCIÓN (ahora flexible)
+                          Flexible(
+                            child: Text(
+                              widget.category.description ??
+                                  'Sin descripción disponible para esta categoría',
+                              style: TextStyle(
+                                color: Colors.grey[400],
+                                fontSize: 13,
+                                fontWeight: FontWeight.w400,
+                                height: 1.3,
                               ),
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                        ),
-                        // Overlay de presionado
-                        if (_isPressed)
-                          Positioned.fill(
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: categoryColor.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(16),
+
+                          const Spacer(), // 👈 Empuja las estadísticas al fondo
+
+                          // FOOTER (stats)
+                          Row(
+                            children: [
+                              _StatItem(
+                                icon: Icons.quiz_outlined,
+                                value: '${widget.category.questionCount ?? 0}',
+                                label: 'Preguntas',
+                                color: categoryColor,
                               ),
-                            ),
+                              if (widget.category.createdAt != null) ...[
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: _StatItem(
+                                    icon: Icons.schedule_outlined,
+                                    value:
+                                        _formatDate(widget.category.createdAt),
+                                    label: 'Creada',
+                                    color: Colors.grey[500]!,
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -472,7 +398,7 @@ class _ActionButtonState extends State<_ActionButton>
                 child: Icon(
                   widget.icon,
                   color: widget.color,
-                  size: 18,
+                  size: 16,
                 ),
               ),
             );
@@ -507,27 +433,34 @@ class _StatItem extends StatelessWidget {
           size: 14,
         ),
         const SizedBox(width: 4),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              value,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
+        Flexible(
+          // 👈 evita overflow horizontal
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min, // 👈 ocupa solo lo necesario
+            children: [
+              Text(
+                value,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-            ),
-            Text(
-              label,
-              style: TextStyle(
-                color: Colors.grey[500],
-                fontSize: 10,
-                fontWeight: FontWeight.w400,
+              Text(
+                label,
+                style: TextStyle(
+                  color: Colors.grey[500],
+                  fontSize: 10,
+                  fontWeight: FontWeight.w400,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ],
     );

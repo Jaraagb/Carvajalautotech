@@ -6,6 +6,32 @@ enum QuestionType {
   freeText,
 }
 
+extension QuestionTypeExtension on QuestionType {
+  String get value {
+    switch (this) {
+      case QuestionType.multipleChoice:
+        return 'multipleChoice';
+      case QuestionType.trueFalse:
+        return 'trueFalse';
+      case QuestionType.freeText:
+        return 'freeText';
+    }
+  }
+
+  static QuestionType fromString(String type) {
+    switch (type) {
+      case 'multipleChoice':
+        return QuestionType.multipleChoice;
+      case 'trueFalse':
+        return QuestionType.trueFalse;
+      case 'freeText':
+        return QuestionType.freeText;
+      default:
+        throw Exception('❌ Tipo de pregunta desconocido: $type');
+    }
+  }
+}
+
 class Category {
   final String id;
   final String name;
@@ -46,8 +72,10 @@ class Category {
       'id': id,
       'name': name,
       'description': description,
-      'createdAt': createdAt?.toIso8601String(),
-      'createdBy': createdBy,
+      'created_at': createdAt.toIso8601String(),
+      'created_by': createdBy,
+      'is_active': isActive,
+      'questionCount': questionCount,
     };
   }
 
@@ -55,9 +83,11 @@ class Category {
     return Category(
       id: json['id'] as String,
       name: json['name'] as String,
-      description: json['description'] as String,
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      createdBy: json['createdBy'] as String,
+      description: json['description'] as String? ?? '',
+      createdAt: DateTime.parse(json['created_at'] as String),
+      createdBy: json['created_by'] as String? ?? '',
+      questionCount: json['questionCount'] as int?,
+      isActive: json['is_active'] as bool? ?? true,
     );
   }
 
@@ -76,6 +106,7 @@ class Question extends Equatable {
   final DateTime createdAt;
   final DateTime updatedAt;
   final String createdBy; // ID del admin
+  final String? imageUrl;
 
   const Question({
     required this.id,
@@ -88,6 +119,7 @@ class Question extends Equatable {
     required this.createdAt,
     required this.updatedAt,
     required this.createdBy,
+    this.imageUrl,
   });
 
   bool get hasTimeLimit => timeLimit != null && timeLimit! > 0;
@@ -103,6 +135,7 @@ class Question extends Equatable {
     DateTime? createdAt,
     DateTime? updatedAt,
     String? createdBy,
+    String? imageUrl,
   }) {
     return Question(
       id: id ?? this.id,
@@ -115,6 +148,7 @@ class Question extends Equatable {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       createdBy: createdBy ?? this.createdBy,
+      imageUrl: imageUrl ?? this.imageUrl,
     );
   }
 
@@ -130,24 +164,24 @@ class Question extends Equatable {
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
       'createdBy': createdBy,
+      'image_url': imageUrl,
     };
   }
 
   factory Question.fromJson(Map<String, dynamic> json) {
     return Question(
       id: json['id'] as String,
-      categoryId: json['categoryId'] as String,
-      type: QuestionType.values.firstWhere(
-        (e) => e.name == json['type'],
-        orElse: () => QuestionType.multipleChoice,
-      ),
+      categoryId: json['category_id'] as String,
+      type: QuestionTypeExtension.fromString(json['type'] as String),
       question: json['question'] as String,
-      options: List<String>.from(json['options'] as List),
-      correctAnswer: json['correctAnswer'] as String,
-      timeLimit: json['timeLimit'] as int?,
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      updatedAt: DateTime.parse(json['updatedAt'] as String),
-      createdBy: json['createdBy'] as String,
+      options:
+          (json['options'] as List<dynamic>).map((e) => e.toString()).toList(),
+      correctAnswer: json['correct_answer'] as String,
+      timeLimit: json['time_limit'] as int?, // <- puede ser null
+      createdAt: DateTime.parse(json['created_at'] as String),
+      updatedAt: DateTime.parse(json['updated_at'] as String),
+      createdBy: json['created_by'] as String,
+      imageUrl: json['image_url'] as String?,
     );
   }
 
@@ -175,6 +209,7 @@ class QuestionForm extends Equatable {
   final List<String> options;
   final String correctAnswer;
   final int? timeLimit;
+  final String? imageUrl;
 
   const QuestionForm({
     this.id,
@@ -184,6 +219,7 @@ class QuestionForm extends Equatable {
     required this.options,
     required this.correctAnswer,
     this.timeLimit,
+    this.imageUrl,
   });
 
   bool get isEditing => id != null;
@@ -197,6 +233,7 @@ class QuestionForm extends Equatable {
       'options': options,
       'correctAnswer': correctAnswer,
       'timeLimit': timeLimit,
+      'image_url': imageUrl,
     };
   }
 
@@ -209,6 +246,7 @@ class QuestionForm extends Equatable {
         options,
         correctAnswer,
         timeLimit,
+        imageUrl,
       ];
 }
 

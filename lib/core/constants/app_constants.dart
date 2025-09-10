@@ -16,12 +16,13 @@ class AppConstants {
   static const String quizResultRoute = '/quiz-result';
 
   // API Endpoints (para configurar con el backend)
-  static const String baseUrl = 'https://api.quizapp.com'; // Cambiar por la URL real
+  static const String baseUrl =
+      'https://api.quizapp.com'; // Cambiar por la URL real
   static const String loginEndpoint = '/auth/login';
   static const String registerEndpoint = '/auth/register';
   static const String refreshTokenEndpoint = '/auth/refresh';
   static const String logoutEndpoint = '/auth/logout';
-  
+
   static const String usersEndpoint = '/users';
   static const String categoriesEndpoint = '/categories';
   static const String questionsEndpoint = '/questions';
@@ -56,14 +57,18 @@ class AppConstants {
   // Mensajes
   static const String appName = 'QuizApp';
   static const String appVersion = '1.0.0';
-  
+
   // Errores comunes
-  static const String networkErrorMessage = 'Error de conexión. Verifica tu internet.';
-  static const String serverErrorMessage = 'Error del servidor. Intenta más tarde.';
-  static const String unauthorizedErrorMessage = 'Sesión expirada. Inicia sesión nuevamente.';
-  static const String validationErrorMessage = 'Por favor verifica los datos ingresados.';
+  static const String networkErrorMessage =
+      'Error de conexión. Verifica tu internet.';
+  static const String serverErrorMessage =
+      'Error del servidor. Intenta más tarde.';
+  static const String unauthorizedErrorMessage =
+      'Sesión expirada. Inicia sesión nuevamente.';
+  static const String validationErrorMessage =
+      'Por favor verifica los datos ingresados.';
   static const String genericErrorMessage = 'Ha ocurrido un error inesperado.';
-  
+
   // Títulos de pantallas
   static const String adminDashboardTitle = 'Panel Administrativo';
   static const String studentDashboardTitle = 'Mi Dashboard';
