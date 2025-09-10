@@ -100,11 +100,11 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen>
                   children: [
                     _buildWelcomeSection(),
                     const SizedBox(height: 24),
-                    _buildStatsSection(),
+                    // _buildStatsSection(),
                     const SizedBox(height: 32),
                     _buildCategoriesSection(),
                     const SizedBox(height: 32),
-                    _buildRecentProgressSection(),
+                    // _buildRecentProgressSection(),
                   ],
                 ),
               ),

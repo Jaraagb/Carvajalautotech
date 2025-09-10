@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/navigation/app_router.dart';
@@ -50,10 +53,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     },
   ];
 
+  String? _displayName;
+  bool _loadingDisplayName = true;
+
   @override
   void initState() {
     super.initState();
     _initializeAnimations();
+    _loadDisplayNameFromProfiles();
   }
 
   void _initializeAnimations() {
@@ -109,21 +116,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
 
                     const SizedBox(height: 24),
 
-                    // Estadísticas
-                    AnimationConfiguration.staggeredList(
-                      position: 1,
-                      duration: const Duration(milliseconds: 700),
-                      child: SlideAnimation(
-                        verticalOffset: 30.0,
-                        child: FadeInAnimation(
-                          child: _buildStatsSection(),
-                        ),
-                      ),
-                    ),
+                    // // Estadísticas
+                    // AnimationConfiguration.staggeredList(
+                    //   position: 1,
+                    //   duration: const Duration(milliseconds: 700),
+                    //   child: SlideAnimation(
+                    //     verticalOffset: 30.0,
+                    //     child: FadeInAnimation(
+                    //       child: _buildStatsSection(),
+                    //     ),
+                    //   ),
+                    // ),
 
                     const SizedBox(height: 32),
 
-                    // Acciones Rápidas
+                    // Acciones
                     AnimationConfiguration.staggeredList(
                       position: 2,
                       duration: const Duration(milliseconds: 800),
@@ -137,17 +144,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
 
                     const SizedBox(height: 32),
 
-                    // Resumen Reciente
-                    AnimationConfiguration.staggeredList(
-                      position: 3,
-                      duration: const Duration(milliseconds: 900),
-                      child: SlideAnimation(
-                        verticalOffset: 30.0,
-                        child: FadeInAnimation(
-                          child: _buildRecentActivitySection(),
-                        ),
-                      ),
-                    ),
+                    // // Resumen Reciente
+                    // AnimationConfiguration.staggeredList(
+                    //   position: 3,
+                    //   duration: const Duration(milliseconds: 900),
+                    //   child: SlideAnimation(
+                    //     verticalOffset: 30.0,
+                    //     child: FadeInAnimation(
+                    //       child: _buildRecentActivitySection(),
+                    //     ),
+                    //   ),
+                    // ),
                   ],
                 ),
               ),
@@ -231,7 +238,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                 children: [
                   Icon(Icons.settings_outlined, color: AppTheme.white),
                   SizedBox(width: 12),
-                  Text('Configuración', style: TextStyle(color: AppTheme.white)),
+                  Text('Configuración',
+                      style: TextStyle(color: AppTheme.white)),
                 ],
               ),
             ),
@@ -241,7 +249,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                 children: [
                   Icon(Icons.logout, color: AppTheme.primaryRed),
                   SizedBox(width: 12),
-                  Text('Cerrar Sesión', style: TextStyle(color: AppTheme.primaryRed)),
+                  Text('Cerrar Sesión',
+                      style: TextStyle(color: AppTheme.primaryRed)),
                 ],
               ),
             ),
@@ -251,7 +260,80 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     );
   }
 
+  Future<void> _loadDisplayNameFromProfiles() async {
+    setState(() => _loadingDisplayName = true);
+
+    try {
+      final client = Supabase.instance.client;
+      final user = client.auth.currentUser;
+      final String? userId = user?.id;
+
+      // Si no hay usuario autenticado -> fallback a email o 'Admin'
+      if (userId == null) {
+        setState(() {
+          _displayName = user?.email ?? 'Admin';
+          _loadingDisplayName = false;
+        });
+        return;
+      }
+
+      // Consulta directa a user_profiles
+      final dynamic res = await client
+          .from('user_profiles')
+          .select('first_name, last_name')
+          .eq('id', userId)
+          .maybeSingle();
+
+      Map<String, dynamic>? row;
+
+      if (res == null) {
+        row = null;
+      } else if (res is Map && res.containsKey('data')) {
+        // A veces la respuesta viene envuelta en { data: [...] }
+        final d = res['data'];
+        if (d is List && d.isNotEmpty) row = Map<String, dynamic>.from(d[0]);
+      } else if (res is List && res.isNotEmpty) {
+        row = Map<String, dynamic>.from(res[0] as Map);
+      } else if (res is Map) {
+        row = Map<String, dynamic>.from(res);
+      } else {
+        row = null;
+      }
+
+      String? name;
+
+      if (row != null) {
+        final first = (row['first_name'] ?? '').toString().trim();
+        final last = (row['last_name'] ?? '').toString().trim();
+        final combined = ('$first $last').trim();
+        if (combined.isNotEmpty) {
+          name = combined;
+        }
+      }
+
+      // fallback final: email o 'Admin'
+      name ??= user?.email ?? 'Admin';
+
+      setState(() {
+        _displayName = name;
+        _loadingDisplayName = false;
+      });
+    } catch (e, st) {
+      debugPrint('Error _loadDisplayNameFromProfiles: $e\n$st');
+      final user = Supabase.instance.client.auth.currentUser;
+      setState(() {
+        _displayName = user?.email ?? 'Admin';
+        _loadingDisplayName = false;
+      });
+    }
+  }
+
   Widget _buildWelcomeSection() {
+    // Si prefieres no mostrar "Cargando..." y usar email inmediatamente,
+    // cambia esta línea por: final display = _displayName ?? Supabase.instance.client.auth.currentUser?.email ?? 'Admin';
+    final display =
+        _loadingDisplayName ? 'Cargando...' : (_displayName ?? 'Admin');
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
@@ -284,11 +366,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '¡Bienvenido, Admin!',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            color: AppTheme.white,
-                            fontWeight: FontWeight.bold,
-                          ),
+                      '¡Bienvenido, $display!',
+                      style:
+                          Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                color: AppTheme.white,
+                                fontWeight: FontWeight.bold,
+                              ),
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -310,6 +393,24 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                 ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _avatarInitials(String? name) {
+    final initials = (name ?? '')
+        .split(' ')
+        .where((p) => p.isNotEmpty)
+        .map((p) => p[0])
+        .take(2)
+        .join()
+        .toUpperCase();
+    final displayInitials = initials.isEmpty ? '?' : initials;
+    return Center(
+      child: Text(
+        displayInitials,
+        style:
+            const TextStyle(color: AppTheme.white, fontWeight: FontWeight.bold),
       ),
     );
   }

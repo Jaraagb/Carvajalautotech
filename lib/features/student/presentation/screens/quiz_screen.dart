@@ -299,22 +299,39 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
         animation: _animationController,
         builder: (context, child) => FadeTransition(
           opacity: _fadeAnimation,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: AnimationLimiter(
-              child: Column(
-                children: [
-                  // Timer (solo si la pregunta tiene timeLimit)
-                  if (currentQuestion.hasTimeLimit) _buildTimerSection(),
-                  if (currentQuestion.hasTimeLimit) const SizedBox(height: 24),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: constraints.maxHeight - 32, // Resta el padding
+                  ),
+                  child: IntrinsicHeight(
+                    child: AnimationLimiter(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Timer (solo si la pregunta tiene timeLimit)
+                          if (currentQuestion.hasTimeLimit)
+                            _buildTimerSection(),
+                          if (currentQuestion.hasTimeLimit)
+                            const SizedBox(height: 24),
 
-                  _buildQuestionSection(currentQuestion),
-                  const SizedBox(height: 32),
+                          _buildQuestionSection(currentQuestion),
+                          const SizedBox(height: 32),
 
-                  Expanded(child: _buildAnswerSection(currentQuestion)),
-                ],
-              ),
-            ),
+                          // ✅ SOLUCIÓN: Cambié Expanded por Flexible
+                          Flexible(
+                            child: _buildAnswerSection(currentQuestion),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
         ),
       ),
@@ -513,10 +530,10 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildMultipleChoiceAnswers(Question question) {
-    return ListView.builder(
-      itemCount: question.options.length,
-      itemBuilder: (context, index) {
-        final option = question.options[index];
+    return Column(
+      children: question.options.asMap().entries.map((entry) {
+        final index = entry.key;
+        final option = entry.value;
         final isSelected = _answers[question.id] == option;
 
         Color cardColor = AppTheme.lightBlack;
@@ -578,12 +595,13 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
             ),
           ),
         );
-      },
+      }).toList(),
     );
   }
 
   Widget _buildTrueFalseAnswers(Question question) {
     return Column(
+      mainAxisSize: MainAxisSize.min, // ✅ Solo usa el espacio mínimo necesario
       children: [
         Row(
           children: [
@@ -595,7 +613,6 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                 child: _buildTrueFalseOption(question, 'Falso', Icons.cancel)),
           ],
         ),
-        const Spacer(),
       ],
     );
   }
@@ -639,6 +656,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
         () => TextEditingController(text: _answers[question.id] ?? ''));
 
     return Column(
+      mainAxisSize: MainAxisSize.min, // ✅ Solo usa el espacio mínimo necesario
       children: [
         TextField(
           controller: controller,

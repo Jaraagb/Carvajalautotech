@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/navigation/app_router.dart';
@@ -30,60 +29,40 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   void _initializeAnimations() {
-    // Controller para el logo
     _logoController = AnimationController(
       duration: const Duration(milliseconds: 1500),
       vsync: this,
     );
 
-    // Controller para el texto
     _textController = AnimationController(
       duration: const Duration(milliseconds: 1000),
       vsync: this,
     );
 
-    // Controller para el fondo
     _backgroundController = AnimationController(
       duration: const Duration(milliseconds: 2000),
       vsync: this,
     );
 
-    // Animaciones
-    _logoAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _logoController,
-      curve: Curves.elasticOut,
-    ));
+    _logoAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _logoController, curve: Curves.elasticOut),
+    );
 
-    _textAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _textController,
-      curve: Curves.easeInOut,
-    ));
+    _textAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _textController, curve: Curves.easeInOut),
+    );
 
-    _backgroundAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _backgroundController,
-      curve: Curves.easeInOut,
-    ));
+    _backgroundAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _backgroundController, curve: Curves.easeInOut),
+    );
   }
 
   void _startAnimations() {
     _backgroundController.forward();
-    
-    Future.delayed(const Duration(milliseconds: 500), () {
-      _logoController.forward();
-    });
-    
-    Future.delayed(const Duration(milliseconds: 1000), () {
-      _textController.forward();
-    });
+    Future.delayed(
+        const Duration(milliseconds: 500), () => _logoController.forward());
+    Future.delayed(
+        const Duration(milliseconds: 1000), () => _textController.forward());
   }
 
   void _navigateToNextScreen() {
@@ -129,17 +108,16 @@ class _SplashScreenState extends State<SplashScreen>
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          // Logo animado
+                          // Logo animado - imagen local
                           AnimatedBuilder(
                             animation: _logoAnimation,
                             builder: (context, child) {
                               return Transform.scale(
-                                scale: _logoAnimation.value,
+                                scale: _logoAnimation.value.clamp(0.0, 1.0),
                                 child: Container(
                                   width: 120,
                                   height: 120,
                                   decoration: BoxDecoration(
-                                    gradient: AppTheme.primaryGradient,
                                     shape: BoxShape.circle,
                                     boxShadow: [
                                       BoxShadow(
@@ -151,19 +129,33 @@ class _SplashScreenState extends State<SplashScreen>
                                       ),
                                     ],
                                   ),
-                                  child: const Icon(
-                                    Icons.quiz_outlined,
-                                    size: 60,
-                                    color: AppTheme.white,
+                                  child: ClipOval(
+                                    child: Image.asset(
+                                      'assets/images/logo.jpeg', // <-- coloca tu imagen aquí
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (ctx, err, stack) {
+                                        // Fallback si no carga la imagen
+                                        return Container(
+                                          color: AppTheme.lightBlack,
+                                          child: const Center(
+                                            child: Icon(
+                                              Icons.quiz_outlined,
+                                              size: 60,
+                                              color: AppTheme.white,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
                                   ),
                                 ),
                               );
                             },
                           ),
-                          
+
                           const SizedBox(height: 32),
-                          
-                          // Texto del app animado
+
+                          // Texto del app animado (título fijo CarvajalAutotech)
                           AnimatedBuilder(
                             animation: _textAnimation,
                             builder: (context, child) {
@@ -171,21 +163,17 @@ class _SplashScreenState extends State<SplashScreen>
                                 opacity: _textAnimation.value,
                                 child: Transform.translate(
                                   offset: Offset(
-                                    0,
-                                    30 * (1 - _textAnimation.value),
-                                  ),
+                                      0, 30 * (1 - _textAnimation.value)),
                                   child: Column(
                                     children: [
-                                      Text(
-                                        AppConstants.appName,
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .headlineMedium
-                                            ?.copyWith(
-                                              color: AppTheme.white,
-                                              fontWeight: FontWeight.bold,
-                                              letterSpacing: 2.0,
-                                            ),
+                                      const Text(
+                                        'CarvajalAutotech', // <-- título fijo
+                                        style: TextStyle(
+                                          color: AppTheme.white,
+                                          fontSize: 28,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 2.0,
+                                        ),
                                       ),
                                       const SizedBox(height: 8),
                                       Text(
@@ -208,14 +196,13 @@ class _SplashScreenState extends State<SplashScreen>
                       ),
                     ),
                   ),
-                  
+
                   // Loading indicator y versión
                   Expanded(
                     flex: 1,
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        // Loading indicator animado
                         AnimatedBuilder(
                           animation: _textAnimation,
                           builder: (context, child) {
@@ -235,8 +222,6 @@ class _SplashScreenState extends State<SplashScreen>
                             );
                           },
                         ),
-                        
-                        // Versión
                         AnimatedBuilder(
                           animation: _textAnimation,
                           builder: (context, child) {

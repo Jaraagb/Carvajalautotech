@@ -47,7 +47,7 @@ class _LoginSelectionScreenState extends State<LoginSelectionScreen>
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-    
+
     return Scaffold(
       body: AnimatedBuilder(
         animation: _backgroundAnimation,
@@ -84,10 +84,11 @@ class _LoginSelectionScreenState extends State<LoginSelectionScreen>
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  // Logo con animación de pulso
+                                  // Logo con animación de pulso (imagen local)
                                   TweenAnimationBuilder<double>(
                                     tween: Tween(begin: 0.8, end: 1.0),
-                                    duration: const Duration(milliseconds: 1000),
+                                    duration:
+                                        const Duration(milliseconds: 1000),
                                     builder: (context, scale, child) {
                                       return Transform.scale(
                                         scale: scale,
@@ -95,6 +96,7 @@ class _LoginSelectionScreenState extends State<LoginSelectionScreen>
                                           width: 100,
                                           height: 100,
                                           decoration: BoxDecoration(
+                                            // Mantengo el gradiente alrededor si quieres borde degradado
                                             gradient: AppTheme.primaryGradient,
                                             shape: BoxShape.circle,
                                             boxShadow: [
@@ -106,18 +108,36 @@ class _LoginSelectionScreenState extends State<LoginSelectionScreen>
                                               ),
                                             ],
                                           ),
-                                          child: const Icon(
-                                            Icons.quiz_outlined,
-                                            size: 50,
-                                            color: AppTheme.white,
+                                          // ClipOval para que la imagen quede circular y respete el contenedor
+                                          child: ClipOval(
+                                            child: Image.asset(
+                                              'assets/images/logo.jpeg',
+                                              fit: BoxFit.cover,
+                                              width: 100,
+                                              height: 100,
+                                              errorBuilder:
+                                                  (ctx, error, stack) {
+                                                // Fallback si no existe la imagen
+                                                return Container(
+                                                  color: AppTheme.lightBlack,
+                                                  child: const Center(
+                                                    child: Icon(
+                                                      Icons.quiz_outlined,
+                                                      size: 50,
+                                                      color: AppTheme.white,
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                            ),
                                           ),
                                         ),
                                       );
                                     },
                                   ),
-                                  
+
                                   const SizedBox(height: 24),
-                                  
+
                                   Text(
                                     '¡Bienvenido!',
                                     style: Theme.of(context)
@@ -128,9 +148,9 @@ class _LoginSelectionScreenState extends State<LoginSelectionScreen>
                                           fontWeight: FontWeight.bold,
                                         ),
                                   ),
-                                  
+
                                   const SizedBox(height: 8),
-                                  
+
                                   Text(
                                     'Selecciona tu tipo de acceso',
                                     style: Theme.of(context)
@@ -148,7 +168,7 @@ class _LoginSelectionScreenState extends State<LoginSelectionScreen>
                         ),
                       ),
                     ),
-                    
+
                     // Botones de selección
                     Expanded(
                       flex: 3,
@@ -167,16 +187,18 @@ class _LoginSelectionScreenState extends State<LoginSelectionScreen>
                                   child: _buildUserTypeCard(
                                     context,
                                     title: 'Estudiante',
-                                    subtitle: 'Responde cuestionarios y ve tus resultados',
+                                    subtitle:
+                                        'Responde cuestionarios y ve tus resultados',
                                     icon: Icons.school_outlined,
                                     onTap: () => Navigator.of(context)
-                                        .pushNamed(AppConstants.studentLoginRoute),
+                                        .pushNamed(
+                                            AppConstants.studentLoginRoute),
                                     isStudent: true,
                                   ),
                                 ),
                               ),
                             ),
-                            
+
                             // Divider animado
                             AnimationConfiguration.staggeredList(
                               position: 2,
@@ -227,7 +249,7 @@ class _LoginSelectionScreenState extends State<LoginSelectionScreen>
                                 ),
                               ),
                             ),
-                            
+
                             // Botón de Administrador
                             AnimationConfiguration.staggeredList(
                               position: 3,
@@ -238,10 +260,12 @@ class _LoginSelectionScreenState extends State<LoginSelectionScreen>
                                   child: _buildUserTypeCard(
                                     context,
                                     title: 'Administrador',
-                                    subtitle: 'Gestiona preguntas y ve estadísticas',
+                                    subtitle:
+                                        'Gestiona preguntas y ve estadísticas',
                                     icon: Icons.admin_panel_settings_outlined,
                                     onTap: () => Navigator.of(context)
-                                        .pushNamed(AppConstants.adminLoginRoute),
+                                        .pushNamed(
+                                            AppConstants.adminLoginRoute),
                                     isStudent: false,
                                   ),
                                 ),
@@ -251,7 +275,7 @@ class _LoginSelectionScreenState extends State<LoginSelectionScreen>
                         ),
                       ),
                     ),
-                    
+
                     // Footer
                     Expanded(
                       flex: 1,
@@ -263,7 +287,7 @@ class _LoginSelectionScreenState extends State<LoginSelectionScreen>
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
                               Text(
-                                'QuizApp v${AppConstants.appVersion}',
+                                'CarvajalAutotechApp v${AppConstants.appVersion}',
                                 style: Theme.of(context)
                                     .textTheme
                                     .bodySmall
@@ -312,7 +336,7 @@ class _LoginSelectionScreenState extends State<LoginSelectionScreen>
           ),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isStudent 
+            color: isStudent
                 ? AppTheme.info.withOpacity(0.3)
                 : AppTheme.primaryRed.withOpacity(0.3),
             width: 2,
@@ -357,9 +381,9 @@ class _LoginSelectionScreenState extends State<LoginSelectionScreen>
                 color: AppTheme.white,
               ),
             ),
-            
+
             const SizedBox(width: 20),
-            
+
             // Textos
             Expanded(
               child: Column(
@@ -382,7 +406,7 @@ class _LoginSelectionScreenState extends State<LoginSelectionScreen>
                 ],
               ),
             ),
-            
+
             // Flecha
             Icon(
               Icons.arrow_forward_ios,
