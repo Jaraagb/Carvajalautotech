@@ -1,5 +1,7 @@
+import 'package:carvajal_autotech/features/admin/presentation/screens/student_list_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../widgets/stats_chart_card.dart';
@@ -18,91 +20,21 @@ class _StatisticsScreenState extends State<StatisticsScreen>
   late Animation<double> _fadeAnimation;
 
   String _selectedPeriod = '7d';
-  bool _isLoading = false;
+  bool _isLoading = true;
 
-  // Datos simulados
-  final Map<String, dynamic> _overallStats = {
-    'totalStudents': 89,
-    'totalQuestions': 156,
-    'totalAnswers': 2341,
-    'averageAccuracy': 78.5,
-    'activeToday': 23,
-    'completedQuizzes': 145,
-  };
+  final supabase = Supabase.instance.client;
 
-  final List<Map<String, dynamic>> _categoryStats = [
-    {
-      'name': 'Matemáticas',
-      'questions': 45,
-      'answers': 892,
-      'accuracy': 82.3,
-      'color': AppTheme.info,
-    },
-    {
-      'name': 'Ciencias',
-      'questions': 38,
-      'answers': 673,
-      'accuracy': 75.1,
-      'color': AppTheme.success,
-    },
-    {
-      'name': 'Historia',
-      'questions': 32,
-      'answers': 521,
-      'accuracy': 79.8,
-      'color': AppTheme.warning,
-    },
-    {
-      'name': 'Literatura',
-      'questions': 25,
-      'answers': 255,
-      'accuracy': 71.2,
-      'color': AppTheme.primaryRed,
-    },
-  ];
-
-  final List<Map<String, dynamic>> _topStudents = [
-    {
-      'name': 'María García',
-      'email': 'maria@email.com',
-      'accuracy': 94.5,
-      'questionsAnswered': 78,
-      'rank': 1,
-    },
-    {
-      'name': 'Juan Pérez',
-      'email': 'juan@email.com',
-      'accuracy': 91.2,
-      'questionsAnswered': 65,
-      'rank': 2,
-    },
-    {
-      'name': 'Ana López',
-      'email': 'ana@email.com',
-      'accuracy': 88.7,
-      'questionsAnswered': 72,
-      'rank': 3,
-    },
-    {
-      'name': 'Carlos Ruiz',
-      'email': 'carlos@email.com',
-      'accuracy': 86.3,
-      'questionsAnswered': 58,
-      'rank': 4,
-    },
-    {
-      'name': 'Laura Díaz',
-      'email': 'laura@email.com',
-      'accuracy': 84.1,
-      'questionsAnswered': 63,
-      'rank': 5,
-    },
-  ];
+  // Datos cargados desde la BD
+  Map<String, dynamic>? _overallStats;
+  List<Map<String, dynamic>> _categoryStats = [];
+  List<Map<String, dynamic>> _topStudents = [];
+  List<Map<String, dynamic>> _trends = [];
 
   @override
   void initState() {
     super.initState();
     _initializeAnimations();
+    _fetchStats();
   }
 
   void _initializeAnimations() {
@@ -122,6 +54,70 @@ class _StatisticsScreenState extends State<StatisticsScreen>
     _animationController.forward();
   }
 
+  Future<void> _fetchStats() async {
+    setState(() => _isLoading = true);
+
+    try {
+      // 1️⃣ Resumen general
+      final overallRes = await supabase.from('stats_overall').select();
+      // Usando la vista pública que ya existe en schema public (app_users)
+      final totalStudentsRes = await supabase.from('app_users').select('id');
+      final totalStudents = (totalStudentsRes as List).length;
+
+      _overallStats = {
+        'totalStudents': totalStudents,
+        'totalQuestions': overallRes[0]['total_questions'],
+        'totalAnswers': overallRes[0]['total_answers'],
+        'averageAccuracy': overallRes[0]['average_accuracy'],
+        'completedQuizzes': overallRes[0]['completed_quizzes'],
+      };
+
+      // 2️⃣ Rendimiento por categoría
+      final categoryRes = await supabase.from('stats_by_category').select();
+
+      _categoryStats = categoryRes.map<Map<String, dynamic>>((c) {
+        return {
+          'name': c['category_name'],
+          'questions': c['total_questions'],
+          'answers': c['total_answers'],
+          'accuracy': c['average_accuracy'],
+          'color': AppTheme.info, // puedes mapear por categoría si quieres
+        };
+      }).toList();
+
+      // 3️⃣ Top estudiantes
+      final topRes = await supabase.from('stats_top_students').select();
+      _topStudents = topRes.map<Map<String, dynamic>>((s) {
+        return {
+          'name': s['name'] ?? 'Sin nombre',
+          'email': s['email'],
+          'accuracy': s['accuracy'],
+          'questionsAnswered': s['questions_answered'],
+          'rank': s['rank'],
+        };
+      }).toList();
+
+      // 4️⃣ Tendencias
+      final trendsRes = await supabase.from('stats_trends').select();
+      _trends = trendsRes.map<Map<String, dynamic>>((t) {
+        return {
+          'day': t['day'],
+          'answers': t['answers'],
+        };
+      }).toList();
+    } catch (e) {
+      debugPrint('Error al cargar estadísticas: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al cargar estadísticas: $e'),
+          backgroundColor: AppTheme.primaryRed,
+        ),
+      );
+    }
+
+    setState(() => _isLoading = false);
+  }
+
   @override
   void dispose() {
     _animationController.dispose();
@@ -138,9 +134,10 @@ class _StatisticsScreenState extends State<StatisticsScreen>
         builder: (context, child) {
           return FadeTransition(
             opacity: _fadeAnimation,
-            child: _isLoading
+            child: _isLoading || _overallStats == null
                 ? const Center(
-                    child: CircularProgressIndicator(color: AppTheme.primaryRed),
+                    child:
+                        CircularProgressIndicator(color: AppTheme.primaryRed),
                   )
                 : SingleChildScrollView(
                     padding: const EdgeInsets.all(16),
@@ -148,73 +145,15 @@ class _StatisticsScreenState extends State<StatisticsScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Filtros de período
-                          AnimationConfiguration.staggeredList(
-                            position: 0,
-                            duration: const Duration(milliseconds: 600),
-                            child: SlideAnimation(
-                              verticalOffset: -30.0,
-                              child: FadeInAnimation(
-                                child: _buildPeriodSelector(),
-                              ),
-                            ),
-                          ),
-
-                          const SizedBox(height: 24),
-
-                          // Estadísticas generales
-                          AnimationConfiguration.staggeredList(
-                            position: 1,
-                            duration: const Duration(milliseconds: 700),
-                            child: SlideAnimation(
-                              horizontalOffset: -30.0,
-                              child: FadeInAnimation(
-                                child: _buildOverallStats(),
-                              ),
-                            ),
-                          ),
-
+                          _buildOverallStats(),
+                          const SizedBox(height: 16),
+                          _buildStudentsCard(), // <-- nuevo widget
                           const SizedBox(height: 32),
-
-                          // Estadísticas por categoría
-                          AnimationConfiguration.staggeredList(
-                            position: 2,
-                            duration: const Duration(milliseconds: 800),
-                            child: SlideAnimation(
-                              verticalOffset: 30.0,
-                              child: FadeInAnimation(
-                                child: _buildCategoryStats(),
-                              ),
-                            ),
-                          ),
-
+                          _buildCategoryStats(),
                           const SizedBox(height: 32),
-
-                          // Top estudiantes
-                          AnimationConfiguration.staggeredList(
-                            position: 3,
-                            duration: const Duration(milliseconds: 900),
-                            child: SlideAnimation(
-                              horizontalOffset: 30.0,
-                              child: FadeInAnimation(
-                                child: _buildTopStudents(),
-                              ),
-                            ),
-                          ),
-
+                          _buildTopStudents(),
                           const SizedBox(height: 32),
-
-                          // Gráficos de tendencias
-                          AnimationConfiguration.staggeredList(
-                            position: 4,
-                            duration: const Duration(milliseconds: 1000),
-                            child: SlideAnimation(
-                              verticalOffset: 30.0,
-                              child: FadeInAnimation(
-                                child: _buildTrendsChart(),
-                              ),
-                            ),
-                          ),
+                          _buildTrendsChart(),
                         ],
                       ),
                     ),
@@ -238,119 +177,10 @@ class _StatisticsScreenState extends State<StatisticsScreen>
       ),
       actions: [
         IconButton(
-          onPressed: () {
-            setState(() {
-              _isLoading = true;
-            });
-            Future.delayed(const Duration(seconds: 2), () {
-              setState(() {
-                _isLoading = false;
-              });
-            });
-          },
+          onPressed: _fetchStats,
           icon: const Icon(Icons.refresh, color: AppTheme.white),
         ),
-        PopupMenuButton<String>(
-          icon: const Icon(Icons.more_vert, color: AppTheme.white),
-          color: AppTheme.lightBlack,
-          onSelected: (value) {
-            switch (value) {
-              case 'export':
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Exportar próximamente'),
-                    backgroundColor: AppTheme.info,
-                  ),
-                );
-                break;
-            }
-          },
-          itemBuilder: (context) => [
-            const PopupMenuItem(
-              value: 'export',
-              child: Row(
-                children: [
-                  Icon(Icons.download, color: AppTheme.white),
-                  SizedBox(width: 12),
-                  Text('Exportar Reporte', style: TextStyle(color: AppTheme.white)),
-                ],
-              ),
-            ),
-          ],
-        ),
       ],
-    );
-  }
-
-  Widget _buildPeriodSelector() {
-    final periods = [
-      {'value': '1d', 'label': '24h'},
-      {'value': '7d', 'label': '7 días'},
-      {'value': '30d', 'label': '30 días'},
-      {'value': '90d', 'label': '3 meses'},
-    ];
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppTheme.lightBlack,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppTheme.greyDark.withOpacity(0.3),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Período de Análisis',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: AppTheme.white,
-                  fontWeight: FontWeight.w600,
-                ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: periods.map((period) {
-              final isSelected = _selectedPeriod == period['value'];
-              return Expanded(
-                child: GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _selectedPeriod = period['value']!;
-                    });
-                  },
-                  child: Container(
-                    margin: const EdgeInsets.only(right: 8),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    decoration: BoxDecoration(
-                      color: isSelected 
-                          ? AppTheme.primaryRed.withOpacity(0.2)
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isSelected 
-                            ? AppTheme.primaryRed
-                            : AppTheme.greyDark.withOpacity(0.5),
-                        width: isSelected ? 2 : 1,
-                      ),
-                    ),
-                    child: Text(
-                      period['label']!,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: isSelected ? AppTheme.primaryRed : AppTheme.greyLight,
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-        ],
-      ),
     );
   }
 
@@ -376,25 +206,25 @@ class _StatisticsScreenState extends State<StatisticsScreen>
           children: [
             _buildStatCard(
               'Estudiantes Totales',
-              _overallStats['totalStudents'].toString(),
+              _overallStats!['totalStudents'].toString(),
               Icons.school_outlined,
               AppTheme.info,
             ),
             _buildStatCard(
               'Preguntas Creadas',
-              _overallStats['totalQuestions'].toString(),
+              _overallStats!['totalQuestions'].toString(),
               Icons.quiz_outlined,
               AppTheme.success,
             ),
             _buildStatCard(
               'Respuestas Totales',
-              _overallStats['totalAnswers'].toString(),
+              _overallStats!['totalAnswers'].toString(),
               Icons.question_answer_outlined,
               AppTheme.warning,
             ),
             _buildStatCard(
               'Precisión Promedio',
-              '${_overallStats['averageAccuracy']}%',
+              '${_overallStats!['averageAccuracy']}%',
               Icons.trending_up_outlined,
               AppTheme.primaryRed,
             ),
@@ -404,7 +234,63 @@ class _StatisticsScreenState extends State<StatisticsScreen>
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+  Widget _buildStudentsCard() {
+    final total = _overallStats?['totalStudents'] ?? '—';
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const StudentsListScreen()),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppTheme.lightBlack,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppTheme.greyDark.withOpacity(0.25)),
+          boxShadow: [
+            BoxShadow(
+                color: AppTheme.primaryRed.withOpacity(0.03),
+                blurRadius: 8,
+                offset: const Offset(0, 4))
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: AppTheme.info.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.people, color: AppTheme.info, size: 28),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Estudiantes',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: AppTheme.white, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 6),
+                  Text('$total disponibles',
+                      style: const TextStyle(
+                          color: AppTheme.greyLight, fontSize: 13)),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: AppTheme.greyLight),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatCard(
+      String title, String value, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -521,7 +407,8 @@ class _StatisticsScreenState extends State<StatisticsScreen>
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: category['color'].withOpacity(0.2),
                       borderRadius: BorderRadius.circular(12),
@@ -572,7 +459,7 @@ class _StatisticsScreenState extends State<StatisticsScreen>
             itemBuilder: (context, index) {
               final student = _topStudents[index];
               final isTop3 = student['rank'] <= 3;
-              
+
               return StudentPerformanceCard(
                 student: student,
                 isTop3: isTop3,
@@ -600,6 +487,7 @@ class _StatisticsScreenState extends State<StatisticsScreen>
         StatsChartCard(
           title: 'Respuestas por Día',
           period: _selectedPeriod,
+          data: _trends, // le pasamos la data real
         ),
       ],
     );

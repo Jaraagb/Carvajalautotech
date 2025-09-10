@@ -52,8 +52,8 @@ class AppRouter {
       case AppConstants.categoriesRoute:
         return _buildRoute(const CategoriesScreen(), settings);
 
-      // case AppConstants.statisticsRoute:
-      //   return _buildRoute(const StatisticsScreen(), settings);
+      case AppConstants.statisticsRoute:
+        return _buildRoute(const StatisticsScreen(), settings);
 
       case AppConstants.quizRoute:
         final categoryId = settings.arguments as String?;

@@ -367,7 +367,7 @@ class _QuestionsListScreenState extends State<QuestionsListScreen>
   void _showDeleteDialog(Question question) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         backgroundColor: AppTheme.lightBlack,
         title: const Text(
           '¿Eliminar Pregunta?',
@@ -379,23 +379,51 @@ class _QuestionsListScreenState extends State<QuestionsListScreen>
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancelar',
-                style: TextStyle(color: AppTheme.greyLight)),
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text(
+              'Cancelar',
+              style: TextStyle(color: AppTheme.greyLight),
+            ),
           ),
           ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              setState(() {
-                _questions.remove(question);
-                _filterQuestions();
-              });
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Pregunta eliminada'),
-                  backgroundColor: AppTheme.success,
-                ),
-              );
+            onPressed: () async {
+              Navigator.of(dialogContext).pop(); // 🔹 cierra solo el diálogo
+
+              try {
+                await _questionsService.deleteQuestion(question.id);
+
+                if (!mounted)
+                  return; // 🔒 evita errores si pantalla ya no existe
+                setState(() {
+                  _questions.remove(question);
+                  _filterQuestions();
+                });
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Pregunta eliminada'),
+                    backgroundColor: AppTheme.success,
+                  ),
+                );
+              } on PostgrestException catch (e) {
+                debugPrint('❌ Error eliminando pregunta: ${e.message}');
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Error eliminando: ${e.message}'),
+                    backgroundColor: AppTheme.error,
+                  ),
+                );
+              } catch (e) {
+                debugPrint('❌ Error inesperado eliminando: $e');
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Error inesperado eliminando'),
+                    backgroundColor: AppTheme.error,
+                  ),
+                );
+              }
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
             child: const Text('Eliminar'),
