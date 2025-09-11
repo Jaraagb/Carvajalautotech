@@ -134,7 +134,6 @@ class _CategoryCardState extends State<CategoryCard>
   @override
   Widget build(BuildContext context) {
     final categoryColor = _getCategoryColor();
-    final categoryIcon = _getCategoryIcon();
 
     return AnimatedBuilder(
       animation: _animationController,
@@ -142,18 +141,14 @@ class _CategoryCardState extends State<CategoryCard>
         return Transform.scale(
           scale: _scaleAnimation.value,
           child: Container(
-            margin: widget.margin ?? const EdgeInsets.all(8),
+            margin: widget.margin ?? const EdgeInsets.symmetric(vertical: 8),
+            width: double.infinity, // Ocupa todo el ancho disponible
             child: MouseRegion(
               onEnter: (_) => _onHoverChanged(true),
               onExit: (_) => _onHoverChanged(false),
               child: GestureDetector(
-                onTapDown: _onTapDown,
-                onTapUp: _onTapUp,
-                onTapCancel: _onTapCancel,
                 onTap: widget.onTap,
-                // Dentro del build:
                 child: Container(
-                  // ❌ Eliminé el height fijo (200)
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
@@ -163,7 +158,7 @@ class _CategoryCardState extends State<CategoryCard>
                         darkSurface,
                       ],
                     ),
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(12), // Ajuste de bordes
                     border: Border.all(
                       color: _isHovered
                           ? categoryColor.withOpacity(0.5)
@@ -195,7 +190,7 @@ class _CategoryCardState extends State<CategoryCard>
                     ],
                   ),
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(12),
                     child: Padding(
                       padding: const EdgeInsets.all(16),
                       child: Column(
@@ -228,7 +223,19 @@ class _CategoryCardState extends State<CategoryCard>
                                   ),
                                 ),
                               ),
-                              const Spacer(),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Text(
+                                  widget.category.name,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
                               if (widget.showActions) ...[
                                 _ActionButton(
                                   icon: Icons.edit_outlined,
@@ -249,38 +256,19 @@ class _CategoryCardState extends State<CategoryCard>
 
                           const SizedBox(height: 12),
 
-                          // NOMBRE
+                          // DESCRIPCIÓN
                           Text(
-                            widget.category.name,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.5,
+                            widget.category.description,
+                            style: TextStyle(
+                              color: Colors.grey[400],
+                              fontSize: 14,
+                              height: 1.3,
                             ),
-                            maxLines: 1,
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
 
-                          const SizedBox(height: 6),
-
-                          // DESCRIPCIÓN (ahora flexible)
-                          Flexible(
-                            child: Text(
-                              widget.category.description ??
-                                  'Sin descripción disponible para esta categoría',
-                              style: TextStyle(
-                                color: Colors.grey[400],
-                                fontSize: 13,
-                                fontWeight: FontWeight.w400,
-                                height: 1.3,
-                              ),
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-
-                          const Spacer(), // 👈 Empuja las estadísticas al fondo
+                          const SizedBox(height: 12),
 
                           // FOOTER (stats)
                           Row(
@@ -291,18 +279,13 @@ class _CategoryCardState extends State<CategoryCard>
                                 label: 'Preguntas',
                                 color: categoryColor,
                               ),
-                              if (widget.category.createdAt != null) ...[
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: _StatItem(
-                                    icon: Icons.schedule_outlined,
-                                    value:
-                                        _formatDate(widget.category.createdAt),
-                                    label: 'Creada',
-                                    color: Colors.grey[500]!,
-                                  ),
-                                ),
-                              ],
+                              const SizedBox(width: 16),
+                              _StatItem(
+                                icon: Icons.people_outline,
+                                value: '${widget.category.studentCount ?? 0}',
+                                label: 'Alumnos',
+                                color: successColor,
+                              ),
                             ],
                           ),
                         ],
@@ -316,19 +299,6 @@ class _CategoryCardState extends State<CategoryCard>
         );
       },
     );
-  }
-
-  String _formatDate(DateTime? date) {
-    if (date == null) return 'N/A';
-    final now = DateTime.now();
-    final difference = now.difference(date).inDays;
-
-    if (difference == 0) return 'Hoy';
-    if (difference == 1) return 'Ayer';
-    if (difference < 7) return '${difference}d';
-    if (difference < 30) return '${(difference / 7).floor()}sem';
-    if (difference < 365) return '${(difference / 30).floor()}m';
-    return '${(difference / 365).floor()}a';
   }
 }
 
@@ -434,10 +404,8 @@ class _StatItem extends StatelessWidget {
         ),
         const SizedBox(width: 4),
         Flexible(
-          // 👈 evita overflow horizontal
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min, // 👈 ocupa solo lo necesario
             children: [
               Text(
                 value,

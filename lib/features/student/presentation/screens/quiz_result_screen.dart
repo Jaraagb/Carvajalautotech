@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/models/question_models.dart';
 import '../../presentation/widgets/custom_button.dart';
 
 class QuizResultScreen extends StatefulWidget {
-  final Map<String, dynamic> results;
+  final Map<String, dynamic>? results;
+  final String? categoryId;
+  final String? categoryName;
 
   const QuizResultScreen({
     Key? key,
-    required this.results,
+    this.results,
+    this.categoryId,
+    this.categoryName,
   }) : super(key: key);
 
   @override
@@ -25,10 +30,24 @@ class _QuizResultScreenState extends State<QuizResultScreen>
   late Animation<double> _scaleAnimation;
   late Animation<double> _rotationAnimation;
 
+  // Variables para manejar datos cargados desde la base de datos
+  Map<String, dynamic>? _loadedResults;
+  bool _isLoading = false;
+  String? _errorMessage;
+
+  // Getter para obtener los datos efectivos (pasados o cargados)
+  Map<String, dynamic>? get effectiveResults =>
+      widget.results ?? _loadedResults;
+
   @override
   void initState() {
     super.initState();
     _initializeAnimations();
+
+    // Si no tenemos results pero sí categoryId, cargar desde DB
+    if (widget.results == null && widget.categoryId != null) {
+      _loadResultsFromDatabase();
+    }
   }
 
   void _initializeAnimations() {
@@ -68,9 +87,128 @@ class _QuizResultScreenState extends State<QuizResultScreen>
 
     _animationController.forward();
 
-    if ((widget.results['accuracy'] as int) >= 80) {
+    // Solo mostrar confetti si tenemos datos y el puntaje es alto
+    final results = effectiveResults;
+    if (results != null && (results['accuracy'] as int? ?? 0) >= 80) {
       Future.delayed(const Duration(milliseconds: 600), () {
         _confettiController.forward();
+      });
+    }
+  }
+
+  Future<void> _loadResultsFromDatabase() async {
+    if (widget.categoryId == null) return;
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final client = Supabase.instance.client;
+      final user = client.auth.currentUser;
+
+      if (user == null) {
+        throw Exception('Usuario no autenticado');
+      }
+
+      // Primero, obtener todas las preguntas de la categoría
+      final questionsResponse = await client
+          .from('questions')
+          .select(
+              'id, question, options, correct_answer, explanation, category_id')
+          .eq('category_id', widget.categoryId!);
+
+      if (questionsResponse.isEmpty) {
+        throw Exception('No se encontraron preguntas para esta categoría');
+      }
+
+      // Luego, obtener las respuestas del estudiante
+      final questionIds = questionsResponse.map((q) => q['id']).toList();
+      final answersResponse = await client
+          .from('student_answers')
+          .select('question_id, student_id, answer, is_correct, time_spent')
+          .eq('student_id', user.id)
+          .inFilter('question_id', questionIds);
+
+      if (answersResponse.isEmpty) {
+        throw Exception('No se encontraron respuestas para esta categoría');
+      }
+
+      // Crear un mapa de respuestas por question_id para fácil búsqueda
+      final answersMap = <String, Map<String, dynamic>>{};
+      for (final answerData in answersResponse) {
+        final questionId = answerData['question_id'].toString();
+        answersMap[questionId] = answerData;
+      }
+
+      // Procesar las preguntas y sus respuestas
+      final questions = <Question>[];
+      final answers = <String, String>{};
+      int correctAnswers = 0;
+      int totalQuestions = questionsResponse.length;
+
+      for (final questionData in questionsResponse) {
+        final questionId = questionData['id'].toString();
+        final answerData = answersMap[questionId];
+
+        if (answerData == null) {
+          // Esta pregunta no fue respondida por el estudiante
+          continue;
+        }
+
+        final isCorrect = answerData['is_correct'] ?? false;
+        if (isCorrect == true || isCorrect == 1 || isCorrect == 'true') {
+          correctAnswers++;
+        }
+
+        // Crear objeto Question
+        final question = Question(
+          id: questionId,
+          categoryId: questionData['category_id'] ?? widget.categoryId!,
+          type: QuestionType.multipleChoice,
+          question: questionData['question'] ?? '',
+          options: List<String>.from(questionData['options'] ?? []),
+          correctAnswer: questionData['correct_answer'] ?? '',
+          explanation: questionData['explanation'],
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+          createdBy: 'system',
+        );
+
+        questions.add(question);
+
+        // Guardar la respuesta del estudiante
+        final selectedAnswer = answerData['answer'] ?? '';
+        answers[questionId] = selectedAnswer;
+      }
+
+      // Actualizar totalQuestions basado en preguntas realmente respondidas
+      totalQuestions = questions.length;
+
+      final accuracy = totalQuestions > 0
+          ? ((correctAnswers / totalQuestions) * 100).round()
+          : 0;
+
+      setState(() {
+        _loadedResults = {
+          'categoryId': widget.categoryId,
+          'categoryName': widget.categoryName ?? 'Categoría',
+          'correctAnswers': correctAnswers,
+          'incorrectAnswers': totalQuestions - correctAnswers,
+          'totalQuestions': totalQuestions,
+          'accuracy': accuracy,
+          'published':
+              true, // Asumimos que está publicado si podemos ver los resultados
+          'questions': questions, // Preguntas reales con explicaciones
+          'answers': answers, // Respuestas del estudiante
+        };
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString();
+        _isLoading = false;
       });
     }
   }
@@ -83,7 +221,9 @@ class _QuizResultScreenState extends State<QuizResultScreen>
   }
 
   Color _getResultColor() {
-    final accuracy = widget.results['accuracy'] as int;
+    final results = effectiveResults;
+    if (results == null) return AppTheme.greyLight;
+    final accuracy = results['accuracy'] as int;
     if (accuracy >= 90) return AppTheme.success;
     if (accuracy >= 80) return AppTheme.info;
     if (accuracy >= 70) return AppTheme.warning;
@@ -91,7 +231,9 @@ class _QuizResultScreenState extends State<QuizResultScreen>
   }
 
   String _getResultMessage() {
-    final accuracy = widget.results['accuracy'] as int;
+    final results = effectiveResults;
+    if (results == null) return 'Cargando resultados...';
+    final accuracy = results['accuracy'] as int;
     if (accuracy >= 90) return '¡Excelente trabajo!';
     if (accuracy >= 80) return '¡Muy bien hecho!';
     if (accuracy >= 70) return '¡Buen trabajo!';
@@ -100,7 +242,9 @@ class _QuizResultScreenState extends State<QuizResultScreen>
   }
 
   IconData _getResultIcon() {
-    final accuracy = widget.results['accuracy'] as int;
+    final results = effectiveResults;
+    if (results == null) return Icons.help;
+    final accuracy = results['accuracy'] as int;
     if (accuracy >= 90) return Icons.emoji_events;
     if (accuracy >= 80) return Icons.thumb_up;
     if (accuracy >= 70) return Icons.sentiment_satisfied;
@@ -109,6 +253,89 @@ class _QuizResultScreenState extends State<QuizResultScreen>
 
   @override
   Widget build(BuildContext context) {
+    // Si estamos cargando, mostrar indicador
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: AppTheme.primaryBlack,
+        body: const Center(
+          child: CircularProgressIndicator(color: AppTheme.info),
+        ),
+      );
+    }
+
+    // Si hay error, mostrar mensaje
+    if (_errorMessage != null) {
+      return Scaffold(
+        backgroundColor: AppTheme.primaryBlack,
+        appBar: AppBar(
+          backgroundColor: AppTheme.primaryBlack,
+          title: const Text('Error', style: TextStyle(color: AppTheme.white)),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: AppTheme.white),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 64, color: AppTheme.error),
+              const SizedBox(height: 16),
+              Text(
+                _errorMessage!,
+                style: const TextStyle(color: AppTheme.white),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Volver'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final results = effectiveResults;
+    if (results == null) {
+      return Scaffold(
+        backgroundColor: AppTheme.primaryBlack,
+        body: const Center(
+          child: Text(
+            'No hay datos disponibles',
+            style: TextStyle(color: AppTheme.white),
+          ),
+        ),
+      );
+    }
+
+    final bool resultsPublished = results['published'] ?? false;
+
+    if (!resultsPublished) {
+      return Scaffold(
+        backgroundColor: AppTheme.primaryBlack,
+        appBar: AppBar(
+          backgroundColor: AppTheme.primaryBlack,
+          title: const Text(
+            'Resultados',
+            style:
+                TextStyle(color: AppTheme.white, fontWeight: FontWeight.w600),
+          ),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: AppTheme.white),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ),
+        body: Center(
+          child: Text(
+            'Los resultados aún no han sido publicados.',
+            style: TextStyle(fontSize: 18, color: AppTheme.greyDark),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppTheme.primaryBlack,
       appBar: AppBar(
@@ -117,7 +344,10 @@ class _QuizResultScreenState extends State<QuizResultScreen>
           'Resultados',
           style: TextStyle(color: AppTheme.white, fontWeight: FontWeight.w600),
         ),
-        leading: const SizedBox(),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: AppTheme.white),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
       ),
       body: AnimatedBuilder(
         animation: _animationController,
@@ -125,7 +355,12 @@ class _QuizResultScreenState extends State<QuizResultScreen>
           return FadeTransition(
             opacity: _fadeAnimation,
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 16,
+                bottom: MediaQuery.of(context).padding.bottom + 20,
+              ),
               child: AnimationLimiter(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -152,16 +387,31 @@ class _QuizResultScreenState extends State<QuizResultScreen>
                       ),
                     ),
                     const SizedBox(height: 24),
-                    AnimationConfiguration.staggeredList(
-                      position: 2,
-                      duration: const Duration(milliseconds: 800),
-                      child: SlideAnimation(
-                        verticalOffset: 30.0,
-                        child: FadeInAnimation(
-                          child: _buildQuestionReviewCard(),
-                        ),
+                    // Debug: Mostrar información sobre las preguntas
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: AppTheme.greyDark.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                       ),
                     ),
+                    // Solo mostrar revisión de preguntas si tenemos preguntas cargadas
+                    if (results['questions'] != null &&
+                        (results['questions'] as List).isNotEmpty)
+                      AnimationConfiguration.staggeredList(
+                        position: 2,
+                        duration: const Duration(milliseconds: 800),
+                        child: SlideAnimation(
+                          verticalOffset: 30.0,
+                          child: FadeInAnimation(
+                            child: _buildQuestionReviewCard(),
+                          ),
+                        ),
+                      ),
                     const SizedBox(height: 32),
                     AnimationConfiguration.staggeredList(
                       position: 3,
@@ -184,7 +434,8 @@ class _QuizResultScreenState extends State<QuizResultScreen>
   }
 
   Widget _buildMainResultCard() {
-    final accuracy = widget.results['accuracy'] as int;
+    final results = effectiveResults!;
+    final accuracy = results['accuracy'] as int;
     final resultColor = _getResultColor();
 
     return Container(
@@ -245,7 +496,7 @@ class _QuizResultScreenState extends State<QuizResultScreen>
           ),
           const SizedBox(height: 16),
           Text(
-            'Respondiste ${widget.results['correctAnswers']} de ${widget.results['totalQuestions']} preguntas correctamente',
+            'Respondiste ${results['correctAnswers']} de ${results['totalQuestions']} preguntas correctamente',
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: AppTheme.white.withOpacity(0.9),
                 ),
@@ -257,6 +508,7 @@ class _QuizResultScreenState extends State<QuizResultScreen>
   }
 
   Widget _buildDetailedStatsCard() {
+    final results = effectiveResults!;
     return Container(
       decoration: BoxDecoration(
         color: AppTheme.lightBlack,
@@ -286,7 +538,7 @@ class _QuizResultScreenState extends State<QuizResultScreen>
                 Expanded(
                   child: _buildStatItem(
                     'Correctas',
-                    widget.results['correctAnswers'].toString(),
+                    results['correctAnswers'].toString(),
                     Icons.check_circle,
                     AppTheme.success,
                   ),
@@ -295,7 +547,7 @@ class _QuizResultScreenState extends State<QuizResultScreen>
                 Expanded(
                   child: _buildStatItem(
                     'Incorrectas',
-                    widget.results['incorrectAnswers'].toString(),
+                    results['incorrectAnswers'].toString(),
                     Icons.cancel,
                     AppTheme.error,
                   ),
@@ -304,7 +556,7 @@ class _QuizResultScreenState extends State<QuizResultScreen>
                 Expanded(
                   child: _buildStatItem(
                     'Total',
-                    widget.results['totalQuestions'].toString(),
+                    results['totalQuestions'].toString(),
                     Icons.quiz,
                     AppTheme.info,
                   ),
@@ -329,8 +581,8 @@ class _QuizResultScreenState extends State<QuizResultScreen>
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: LinearProgressIndicator(
-                    value: widget.results['correctAnswers'] /
-                        widget.results['totalQuestions'],
+                    value:
+                        results['correctAnswers'] / results['totalQuestions'],
                     backgroundColor: AppTheme.greyDark.withOpacity(0.3),
                     valueColor:
                         AlwaysStoppedAnimation<Color>(_getResultColor()),
@@ -383,8 +635,9 @@ class _QuizResultScreenState extends State<QuizResultScreen>
   }
 
   Widget _buildQuestionReviewCard() {
-    final questions = widget.results['questions'] as List<Question>;
-    final answers = widget.results['answers'] as Map<String, String>;
+    final results = effectiveResults!;
+    final questions = results['questions'] as List<Question>;
+    final answers = results['answers'] as Map<String, String>;
 
     return Container(
       decoration: BoxDecoration(
@@ -396,14 +649,15 @@ class _QuizResultScreenState extends State<QuizResultScreen>
         ),
       ),
       child: Column(
-        mainAxisSize:
-            MainAxisSize.min, // ✅ CLAVE: Solo toma el espacio mínimo necesario
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
             padding: const EdgeInsets.all(20),
             child: Row(
               children: [
+                Icon(Icons.quiz, color: AppTheme.info, size: 24),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     'Repaso de Preguntas',
@@ -668,55 +922,108 @@ class _QuizResultScreenState extends State<QuizResultScreen>
               ),
             ),
           ],
+
+          // Explicación (si existe)
+          if (question.explanation != null &&
+              question.explanation!.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.info.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: AppTheme.info.withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.lightbulb_outline,
+                          color: AppTheme.info, size: 16),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Explicación:',
+                        style: TextStyle(
+                          color: AppTheme.info,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    question.explanation!,
+                    style: const TextStyle(
+                      color: AppTheme.white,
+                      fontSize: 13,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 
+// SOLUCIÓN 3: Usar Container con margen bottom
   Widget _buildActionButtons() {
-    return Column(
-      children: [
-        CustomButton(
-          text: 'Intentar de Nuevo',
-          onPressed: () {
-            Navigator.of(context).pop();
-            Navigator.of(context).pushReplacementNamed(
-              AppConstants.quizRoute,
-              arguments: widget.results['categoryId'],
-            );
-          },
-          gradient: LinearGradient(
-            colors: [AppTheme.info, AppTheme.info.withOpacity(0.8)],
+    return Container(
+      margin: EdgeInsets.only(
+        bottom: MediaQuery.of(context).padding.bottom + 16,
+      ),
+      child: Column(
+        children: [
+          CustomButton(
+            text: 'Intentar de Nuevo',
+            onPressed: () {
+              Navigator.of(context).pop();
+              Navigator.of(context).pushReplacementNamed(
+                AppConstants.quizRoute,
+                arguments: widget.categoryId ?? effectiveResults?['categoryId'],
+              );
+            },
+            gradient: LinearGradient(
+              colors: [AppTheme.info, AppTheme.info.withOpacity(0.8)],
+            ),
+            icon: Icons.refresh,
           ),
-          icon: Icons.refresh,
-        ),
-        const SizedBox(height: 12),
-        CustomButton(
-          text: 'Volver al Dashboard',
-          onPressed: () {
-            Navigator.of(context).pushNamedAndRemoveUntil(
-              AppConstants.studentDashboardRoute,
-              (route) => false,
-            );
-          },
-          isOutlined: true,
-          icon: Icons.home,
-        ),
-        const SizedBox(height: 12),
-        CustomButton(
-          text: 'Compartir Resultado',
-          onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Función de compartir próximamente'),
-                backgroundColor: AppTheme.info,
-              ),
-            );
-          },
-          backgroundColor: AppTheme.greyDark,
-          icon: Icons.share,
-        ),
-      ],
+          const SizedBox(height: 12),
+          CustomButton(
+            text: 'Volver al Dashboard',
+            onPressed: () {
+              Navigator.of(context).pushNamedAndRemoveUntil(
+                AppConstants.studentDashboardRoute,
+                (route) => false,
+              );
+            },
+            isOutlined: true,
+            icon: Icons.home,
+          ),
+          const SizedBox(height: 12),
+          CustomButton(
+            text: 'Compartir Resultado',
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Función de compartir próximamente'),
+                  backgroundColor: AppTheme.info,
+                ),
+              );
+            },
+            backgroundColor: AppTheme.greyDark,
+            icon: Icons.share,
+          ),
+        ],
+      ),
     );
   }
 }

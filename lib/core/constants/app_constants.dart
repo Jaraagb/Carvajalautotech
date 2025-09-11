@@ -5,6 +5,8 @@ class AppConstants {
   static const String adminLoginRoute = '/admin-login';
   static const String studentLoginRoute = '/student-login';
   static const String studentRegisterRoute = '/student-register';
+  static const String forgotPasswordRoute = '/forgot-password';
+  static const String resetPasswordRoute = '/reset-password';
   static const String adminDashboardRoute = '/admin-dashboard';
   static const String studentDashboardRoute = '/student-dashboard';
   static const String createQuestionRoute = '/create-question';
@@ -37,7 +39,7 @@ class AppConstants {
 
   // Validaciones
   static const int minPasswordLength = 6;
-  static const int maxQuestionLength = 500;
+  static const int maxQuestionLength = 2500;
   static const int maxOptionLength = 200;
   static const int minOptionsCount = 2;
   static const int maxOptionsCount = 6;

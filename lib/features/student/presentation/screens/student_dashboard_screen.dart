@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/navigation/app_router.dart';
@@ -28,20 +29,34 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen>
   bool _isLoadingCategories = true;
   String? _errorCategories;
 
-  // Datos simulados del estudiante
-  final Map<String, dynamic> _studentStats = {
-    'totalAnswered': 45,
-    'correctAnswers': 38,
-    'incorrectAnswers': 7,
-    'accuracyPercentage': 84.4,
-    'streak': 5,
+  // Mapa para almacenar el estado de publicación de cada categoría
+  Map<String, bool> _categoryPublicationStatus = {};
+
+  // Mapa para almacenar las estadísticas de cada categoría
+  Map<String, Map<String, dynamic>> _categoryStats = {};
+
+  // Estadísticas reales del estudiante (solo de categorías publicadas)
+  Map<String, dynamic> _studentStats = {
+    'totalAnswered': 0,
+    'correctAnswers': 0,
+    'incorrectAnswers': 0,
+    'accuracyPercentage': 0.0,
+    'streak': 0,
   };
+  bool _loadingStats = true;
+
+  String? _displayName;
+  bool _loadingDisplayName = true;
 
   @override
   void initState() {
     super.initState();
     _initializeAnimations();
     _fetchCategories();
+    _loadDisplayNameFromProfiles();
+    _loadStudentStats();
+    _loadCategoryPublicationStatus();
+    _loadCategoryStats();
   }
 
   void _initializeAnimations() {
@@ -63,16 +78,305 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen>
 
   Future<void> _fetchCategories() async {
     try {
+      final client = Supabase.instance.client;
+      final user = client.auth.currentUser;
+
+      if (user == null) {
+        setState(() {
+          _errorCategories = "No se pudo obtener el usuario.";
+          _isLoadingCategories = false;
+        });
+        return;
+      }
+
+      // Obtener todas las categorías asignadas al estudiante
+      final response = await client
+          .from('student_categories')
+          .select('category_id')
+          .eq('student_id', user.id);
+
+      if (response.isEmpty) {
+        setState(() {
+          _categories = [];
+          _isLoadingCategories = false;
+        });
+        return;
+      }
+
+      // Extraer los IDs de las categorías asignadas
+      final assignedCategoryIds = (response as List)
+          .map((item) => item['category_id'] as String)
+          .toList();
+
+      // Obtener las categorías activas que coincidan con los IDs asignados
       final cats = await _categoryService.getActiveCategories();
       setState(() {
-        _categories = cats;
+        _categories = cats
+            .where((category) => assignedCategoryIds.contains(category.id))
+            .toList();
         _isLoadingCategories = false;
       });
     } catch (e) {
       setState(() {
-        _errorCategories = "Error cargando categorías";
+        _errorCategories = "Error cargando categorías asignadas.";
         _isLoadingCategories = false;
       });
+    }
+  }
+
+  Future<void> _fetchCategoriesWithProgress() async {
+    try {
+      final client = Supabase.instance.client;
+      final user = client.auth.currentUser;
+
+      if (user == null) {
+        print('❌ Usuario no encontrado.');
+        setState(() {
+          _errorCategories = "No se pudo obtener el usuario.";
+          _isLoadingCategories = false;
+        });
+        return;
+      }
+
+      print(
+          '🔍 Consultando progreso de categorías para el estudiante con ID: ${user.id}');
+
+      // Consulta para obtener el progreso del estudiante en cada categoría
+      final response =
+          await _categoryService.fetchCategoriesWithProgress(user.id);
+
+      print('✅ Respuesta del servicio de categorías: $response');
+
+      if (response.isEmpty) {
+        print('⚠️ No se encontraron categorías con progreso.');
+        setState(() {
+          _categories = [];
+          _isLoadingCategories = false;
+        });
+        return;
+      }
+
+      setState(() {
+        _categories = response.cast<Category>();
+        _isLoadingCategories = false;
+      });
+
+      print('✅ Categorías cargadas en el estado: $_categories');
+    } catch (e) {
+      print('❌ Error cargando categorías con progreso: $e');
+      setState(() {
+        _errorCategories = "Error cargando categorías con progreso.";
+        _isLoadingCategories = false;
+      });
+    }
+  }
+
+  Future<void> _loadDisplayNameFromProfiles() async {
+    setState(() => _loadingDisplayName = true);
+
+    try {
+      final client = Supabase.instance.client;
+      final user = client.auth.currentUser;
+      final String? userId = user?.id;
+
+      if (userId == null) {
+        setState(() {
+          _displayName = user?.email ?? 'Estudiante';
+          _loadingDisplayName = false;
+        });
+        return;
+      }
+
+      final dynamic res = await client
+          .from('user_profiles')
+          .select('first_name, last_name')
+          .eq('id', userId)
+          .maybeSingle();
+
+      Map<String, dynamic>? row;
+
+      if (res == null) {
+        row = null;
+      } else if (res is Map && res.containsKey('data')) {
+        final d = res['data'];
+        if (d is List && d.isNotEmpty) row = Map<String, dynamic>.from(d[0]);
+      } else if (res is List && res.isNotEmpty) {
+        row = Map<String, dynamic>.from(res[0] as Map);
+      } else if (res is Map) {
+        row = Map<String, dynamic>.from(res);
+      } else {
+        row = null;
+      }
+
+      String? name;
+
+      if (row != null) {
+        final first = (row['first_name'] ?? '').toString().trim();
+        final last = (row['last_name'] ?? '').toString().trim();
+        final combined = ('$first $last').trim();
+        if (combined.isNotEmpty) {
+          name = combined;
+        }
+      }
+
+      name ??= user?.email ?? 'Estudiante';
+
+      setState(() {
+        _displayName = name;
+        _loadingDisplayName = false;
+      });
+    } catch (e, st) {
+      debugPrint('Error _loadDisplayNameFromProfiles: $e\n$st');
+      final user = Supabase.instance.client.auth.currentUser;
+      setState(() {
+        _displayName = user?.email ?? 'Estudiante';
+        _loadingDisplayName = false;
+      });
+    }
+  }
+
+  /// Carga las estadísticas del estudiante solo de categorías publicadas
+  Future<void> _loadStudentStats() async {
+    setState(() => _loadingStats = true);
+
+    try {
+      final client = Supabase.instance.client;
+      final user = client.auth.currentUser;
+
+      if (user == null) {
+        setState(() => _loadingStats = false);
+        return;
+      }
+
+      // Obtener estadísticas solo de categorías publicadas usando la nueva vista
+      final response = await client
+          .from('student_category_publication_status')
+          .select('total_answers, correct_answers, published')
+          .eq('student_id', user.id)
+          .eq('published', true);
+
+      int totalAnswered = 0;
+      int correctAnswers = 0;
+
+      for (var category in response) {
+        totalAnswered += (category['total_answers'] as int? ?? 0);
+        correctAnswers += (category['correct_answers'] as int? ?? 0);
+      }
+
+      final incorrectAnswers = totalAnswered - correctAnswers;
+      final accuracyPercentage =
+          totalAnswered > 0 ? (correctAnswers / totalAnswered) * 100.0 : 0.0;
+
+      setState(() {
+        _studentStats = {
+          'totalAnswered': totalAnswered,
+          'correctAnswers': correctAnswers,
+          'incorrectAnswers': incorrectAnswers,
+          'accuracyPercentage':
+              double.parse(accuracyPercentage.toStringAsFixed(1)),
+          'streak': 0, // TODO: Implementar lógica de racha
+        };
+        _loadingStats = false;
+      });
+    } catch (e) {
+      print('Error cargando estadísticas del estudiante: $e');
+      setState(() => _loadingStats = false);
+    }
+  }
+
+  /// Carga el estado de publicación de cada categoría asignada al estudiante
+  Future<void> _loadCategoryPublicationStatus() async {
+    try {
+      final client = Supabase.instance.client;
+      final user = client.auth.currentUser;
+
+      if (user == null) return;
+
+      // Obtener el estado de publicación de todas las categorías del estudiante
+      final response = await client
+          .from('student_categories')
+          .select('category_id, published')
+          .eq('student_id', user.id);
+
+      final Map<String, bool> statusMap = {};
+      for (var item in response) {
+        final categoryId = item['category_id'] as String;
+        final published = item['published'] as bool? ?? false;
+        statusMap[categoryId] = published;
+      }
+
+      setState(() {
+        _categoryPublicationStatus = statusMap;
+      });
+    } catch (e) {
+      print('Error cargando estado de publicación: $e');
+    }
+  }
+
+  /// Carga las estadísticas individuales de cada categoría
+  Future<void> _loadCategoryStats() async {
+    try {
+      final client = Supabase.instance.client;
+      final user = client.auth.currentUser;
+
+      if (user == null) return;
+
+      // Obtener estadísticas completas de todas las categorías usando la vista
+      final response = await client
+          .from('student_category_publication_status')
+          .select(
+              'category_id, total_answers, correct_answers, success_percentage, published')
+          .eq('student_id', user.id);
+
+      // También obtener el conteo de preguntas por categoría
+      final categoryIds = response.map((item) => item['category_id']).toList();
+      Map<String, int> questionCounts = {};
+
+      if (categoryIds.isNotEmpty) {
+        final questionCountsResponse = await client
+            .from('questions')
+            .select('category_id')
+            .inFilter('category_id', categoryIds);
+
+        // Contar preguntas por categoría
+        for (var question in questionCountsResponse) {
+          final categoryId = question['category_id'] as String;
+          questionCounts[categoryId] = (questionCounts[categoryId] ?? 0) + 1;
+        }
+      }
+
+      final Map<String, Map<String, dynamic>> statsMap = {};
+
+      for (var item in response) {
+        final categoryId = item['category_id'] as String;
+        final isPublished = item['published'] as bool? ?? false;
+        final questionCount = questionCounts[categoryId] ?? 0;
+
+        // Solo mostrar estadísticas si está publicado
+        if (isPublished) {
+          statsMap[categoryId] = {
+            'totalAnswers': item['total_answers'] as int? ?? 0,
+            'correctAnswers': item['correct_answers'] as int? ?? 0,
+            'successPercentage': item['success_percentage'] as num? ?? 0.0,
+            'questionCount': questionCount,
+          };
+        } else {
+          // Si no está publicado, mostrar datos vacíos
+          statsMap[categoryId] = {
+            'totalAnswers': 0,
+            'correctAnswers': 0,
+            'successPercentage': 0.0,
+            'questionCount':
+                questionCount, // El número de preguntas siempre se puede mostrar
+          };
+        }
+      }
+
+      setState(() {
+        _categoryStats = statsMap;
+      });
+    } catch (e) {
+      print('Error cargando estadísticas de categorías: $e');
     }
   }
 
@@ -243,7 +547,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen>
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      '¡Hola, Juan!',
+                      '¡Hola, ${_loadingDisplayName ? "Cargando..." : (_displayName ?? "Estudiante")}!',
                       style:
                           Theme.of(context).textTheme.headlineSmall?.copyWith(
                                 color: AppTheme.white,
@@ -263,20 +567,20 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen>
             ],
           ),
           const SizedBox(height: 16),
-          Row(
-            children: [
-              const Icon(Icons.local_fire_department,
-                  color: AppTheme.white, size: 16),
-              const SizedBox(width: 4),
-              Text(
-                'Racha de ${_studentStats['streak']} días',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppTheme.white.withOpacity(0.9),
-                      fontWeight: FontWeight.w600,
-                    ),
-              ),
-            ],
-          ),
+          // Row(
+          //   children: [
+          //     const Icon(Icons.local_fire_department,
+          //         color: AppTheme.white, size: 16),
+          //     const SizedBox(width: 4),
+          //     Text(
+          //       'Racha de ${_studentStats['streak']} días',
+          //       style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          //             color: AppTheme.white.withOpacity(0.9),
+          //             fontWeight: FontWeight.w600,
+          //           ),
+          //     ),
+          //   ],
+          // ),
         ],
       ),
     );
@@ -365,6 +669,15 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen>
             itemCount: _categories.length,
             itemBuilder: (context, index) {
               final cat = _categories[index];
+              final isPublished = _categoryPublicationStatus[cat.id] ?? false;
+              final stats = _categoryStats[cat.id] ??
+                  {
+                    'totalAnswers': 0,
+                    'correctAnswers': 0,
+                    'successPercentage': 0.0,
+                    'questionCount': 10,
+                  };
+
               return Padding(
                 padding: const EdgeInsets.only(bottom: 16),
                 child: CategoryQuizCard(
@@ -372,17 +685,35 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen>
                     'id': cat.id,
                     'name': cat.name,
                     'description': cat.description,
-                    'questionCount': 0, // TODO: traer desde Supabase
-                    'completed': 0, // TODO: progreso real
-                    'lastScore': null, // TODO: historial real
+                    'questionCount': stats['questionCount'] as int,
+                    'completed': stats['totalAnswers'] as int,
+                    'lastScore': isPublished && stats['totalAnswers'] > 0
+                        ? (stats['successPercentage'] as num).toDouble()
+                        : null,
                     'icon': Icons.category,
                     'color': AppTheme.info,
                   },
+                  isResultsPublished: isPublished,
                   onTap: () {
-                    Navigator.of(context).pushNamed(
-                      AppConstants.quizRoute,
-                      arguments: cat.id,
-                    );
+                    final stats = _categoryStats[cat.id] ?? {};
+                    final hasAnswers = (stats['totalAnswers'] as int? ?? 0) > 0;
+
+                    if (hasAnswers && isPublished) {
+                      // Si tiene respuestas y está publicado, ir a los resultados
+                      Navigator.of(context).pushNamed(
+                        AppConstants.quizResultRoute,
+                        arguments: {
+                          'categoryId': cat.id,
+                          'categoryName': cat.name,
+                        },
+                      );
+                    } else {
+                      // Si no tiene respuestas o no está publicado, ir al quiz
+                      Navigator.of(context).pushNamed(
+                        AppConstants.quizRoute,
+                        arguments: cat.id,
+                      );
+                    }
                   },
                 ),
               );

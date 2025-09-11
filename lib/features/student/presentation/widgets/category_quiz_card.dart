@@ -4,11 +4,13 @@ import '../../../../core/theme/app_theme.dart';
 class CategoryQuizCard extends StatefulWidget {
   final Map<String, dynamic> category;
   final VoidCallback onTap;
+  final bool isResultsPublished;
 
   const CategoryQuizCard({
     Key? key,
     required this.category,
     required this.onTap,
+    this.isResultsPublished = false,
   }) : super(key: key);
 
   @override
@@ -91,10 +93,16 @@ class _CategoryQuizCardState extends State<CategoryQuizCard>
   @override
   Widget build(BuildContext context) {
     final name = widget.category['name'] as String;
-    final completed = widget.category['completed'] ?? 0;
-    final questionCount = widget.category['questionCount'] ?? 0;
+    final completed =
+        widget.category['completed'] ?? 0; // Preguntas respondidas
+    final questionCount =
+        widget.category['questionCount'] ?? 0; // Total de preguntas
     final progress = _safeProgress(completed, questionCount);
-    final lastScore = widget.category['lastScore'];
+
+    print('🔹 Mostrando categoría: $name');
+    print('   - Preguntas respondidas: $completed');
+    print('   - Total de preguntas: $questionCount');
+    print('   - Progreso calculado: $progress');
 
     final color = _getCategoryColor(name);
 
@@ -188,21 +196,86 @@ class _CategoryQuizCardState extends State<CategoryQuizCard>
                         ),
                         const SizedBox(height: 12),
 
-                        // Progreso
+                        // Progreso y estado de publicación
                         Row(
                           children: [
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    'Progreso: $completed/$questionCount',
-                                    style: const TextStyle(
-                                      color: AppTheme.greyLight,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500,
-                                    ),
+                                  Row(
+                                    children: [
+                                      Text(
+                                        'Progreso: $completed/$questionCount',
+                                        style: const TextStyle(
+                                          color: AppTheme.greyLight,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      if (completed > 0) ...[
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: widget.isResultsPublished
+                                                ? AppTheme.success
+                                                    .withOpacity(0.2)
+                                                : AppTheme.warning
+                                                    .withOpacity(0.2),
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                widget.isResultsPublished
+                                                    ? Icons.visibility
+                                                    : Icons.visibility_off,
+                                                size: 10,
+                                                color: widget.isResultsPublished
+                                                    ? AppTheme.success
+                                                    : AppTheme.warning,
+                                              ),
+                                              const SizedBox(width: 2),
+                                              Text(
+                                                widget.isResultsPublished
+                                                    ? 'Resultados visibles'
+                                                    : 'Resultados pendientes',
+                                                style: TextStyle(
+                                                  color:
+                                                      widget.isResultsPublished
+                                                          ? AppTheme.success
+                                                          : AppTheme.warning,
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ],
                                   ),
+                                  // Mostrar puntuación solo si está publicado y hay respuestas
+                                  if (widget.isResultsPublished &&
+                                      completed > 0 &&
+                                      widget.category['lastScore'] != null) ...[
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Puntuación: ${(widget.category['lastScore'] as double).toStringAsFixed(1)}%',
+                                      style: TextStyle(
+                                        color: _getScoreColor(
+                                            (widget.category['lastScore']
+                                                    as double)
+                                                .round()),
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
                                   const SizedBox(height: 4),
                                   LinearProgressIndicator(
                                     value: progress,
@@ -215,67 +288,10 @@ class _CategoryQuizCardState extends State<CategoryQuizCard>
                                 ],
                               ),
                             ),
-                            const SizedBox(width: 16),
-
-                            // Última puntuación o botón de comenzar
-                            if (lastScore != null) ...[
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: _getScoreColor(lastScore)
-                                      .withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: _getScoreColor(lastScore)
-                                        .withOpacity(0.5),
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Text(
-                                  '$lastScore%',
-                                  style: TextStyle(
-                                    color: _getScoreColor(lastScore),
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ] else ...[
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [color, color.withOpacity(0.8)],
-                                  ),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Text(
-                                  'NUEVO',
-                                  style: TextStyle(
-                                    color: AppTheme.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                            ],
                           ],
                         ),
                       ],
                     ),
-                  ),
-
-                  // Flecha
-                  Icon(
-                    Icons.arrow_forward_ios,
-                    color: color,
-                    size: 20,
                   ),
                 ],
               ),

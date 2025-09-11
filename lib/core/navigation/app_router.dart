@@ -5,6 +5,7 @@ import '../../features/auth/presentation/screens/login_selection_screen.dart';
 import '../../features/auth/presentation/screens/admin_login_screen.dart';
 import '../../features/auth/presentation/screens/student_login_screen.dart';
 import '../../features/auth/presentation/screens/student_register_screen.dart';
+import '../../features/auth/presentation/screens/simple_reset_password_screen.dart';
 import '../../features/admin/presentation/screens/admin_dashboard_screen.dart';
 import '../../features/admin/presentation/screens/questions_list_screen.dart';
 import '../../features/admin/presentation/screens/create_question_screen.dart';
@@ -31,6 +32,12 @@ class AppRouter {
 
       case AppConstants.studentRegisterRoute:
         return _buildRoute(const StudentRegisterScreen(), settings);
+
+      case AppConstants.forgotPasswordRoute:
+        return _buildRoute(const SimpleResetPasswordScreen(), settings);
+
+      case AppConstants.resetPasswordRoute:
+        return _buildRoute(const SimpleResetPasswordScreen(), settings);
 
       case AppConstants.adminDashboardRoute:
         return _buildRoute(const AdminDashboardScreen(), settings);
@@ -60,8 +67,24 @@ class AppRouter {
         return _buildRoute(QuizScreen(categoryId: categoryId), settings);
 
       case AppConstants.quizResultRoute:
-        final results = settings.arguments as Map<String, dynamic>?;
-        return _buildRoute(QuizResultScreen(results: results ?? {}), settings);
+        final args = settings.arguments;
+        if (args is Map<String, dynamic>) {
+          // Caso 1: Argumentos vienen del dashboard con categoryId y categoryName
+          if (args.containsKey('categoryId')) {
+            return _buildRoute(
+                QuizResultScreen(
+                  categoryId: args['categoryId'],
+                  categoryName: args['categoryName'],
+                ),
+                settings);
+          }
+          // Caso 2: Argumentos son los results del quiz completado
+          else {
+            return _buildRoute(QuizResultScreen(results: args), settings);
+          }
+        }
+        // Caso 3: Sin argumentos válidos
+        return _buildRoute(QuizResultScreen(results: {}), settings);
 
       default:
         return _buildRoute(

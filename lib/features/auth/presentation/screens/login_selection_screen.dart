@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
+import 'package:auto_size_text/auto_size_text.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_theme.dart';
 
@@ -69,7 +70,6 @@ class _LoginSelectionScreenState extends State<LoginSelectionScreen>
               child: AnimationLimiter(
                 child: Column(
                   children: [
-                    // Header con logo y título
                     Expanded(
                       flex: 2,
                       child: AnimationConfiguration.staggeredList(
@@ -84,7 +84,6 @@ class _LoginSelectionScreenState extends State<LoginSelectionScreen>
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  // Logo con animación de pulso (imagen local)
                                   TweenAnimationBuilder<double>(
                                     tween: Tween(begin: 0.8, end: 1.0),
                                     duration:
@@ -96,7 +95,6 @@ class _LoginSelectionScreenState extends State<LoginSelectionScreen>
                                           width: 100,
                                           height: 100,
                                           decoration: BoxDecoration(
-                                            // Mantengo el gradiente alrededor si quieres borde degradado
                                             gradient: AppTheme.primaryGradient,
                                             shape: BoxShape.circle,
                                             boxShadow: [
@@ -108,7 +106,6 @@ class _LoginSelectionScreenState extends State<LoginSelectionScreen>
                                               ),
                                             ],
                                           ),
-                                          // ClipOval para que la imagen quede circular y respete el contenedor
                                           child: ClipOval(
                                             child: Image.asset(
                                               'assets/images/logo.jpeg',
@@ -117,7 +114,6 @@ class _LoginSelectionScreenState extends State<LoginSelectionScreen>
                                               height: 100,
                                               errorBuilder:
                                                   (ctx, error, stack) {
-                                                // Fallback si no existe la imagen
                                                 return Container(
                                                   color: AppTheme.lightBlack,
                                                   child: const Center(
@@ -135,10 +131,8 @@ class _LoginSelectionScreenState extends State<LoginSelectionScreen>
                                       );
                                     },
                                   ),
-
                                   const SizedBox(height: 24),
-
-                                  Text(
+                                  AutoSizeText(
                                     '¡Bienvenido!',
                                     style: Theme.of(context)
                                         .textTheme
@@ -147,11 +141,12 @@ class _LoginSelectionScreenState extends State<LoginSelectionScreen>
                                           color: AppTheme.white,
                                           fontWeight: FontWeight.bold,
                                         ),
+                                    maxLines: 1,
+                                    minFontSize: 20,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-
                                   const SizedBox(height: 8),
-
-                                  Text(
+                                  AutoSizeText(
                                     'Selecciona tu tipo de acceso',
                                     style: Theme.of(context)
                                         .textTheme
@@ -160,6 +155,9 @@ class _LoginSelectionScreenState extends State<LoginSelectionScreen>
                                           color: AppTheme.greyLight,
                                         ),
                                     textAlign: TextAlign.center,
+                                    maxLines: 2,
+                                    minFontSize: 12,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ],
                               ),
@@ -168,8 +166,6 @@ class _LoginSelectionScreenState extends State<LoginSelectionScreen>
                         ),
                       ),
                     ),
-
-                    // Botones de selección
                     Expanded(
                       flex: 3,
                       child: Padding(
@@ -177,7 +173,6 @@ class _LoginSelectionScreenState extends State<LoginSelectionScreen>
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
-                            // Botón de Estudiante
                             AnimationConfiguration.staggeredList(
                               position: 1,
                               duration: const Duration(milliseconds: 600),
@@ -198,8 +193,6 @@ class _LoginSelectionScreenState extends State<LoginSelectionScreen>
                                 ),
                               ),
                             ),
-
-                            // Divider animado
                             AnimationConfiguration.staggeredList(
                               position: 2,
                               duration: const Duration(milliseconds: 400),
@@ -249,8 +242,6 @@ class _LoginSelectionScreenState extends State<LoginSelectionScreen>
                                 ),
                               ),
                             ),
-
-                            // Botón de Administrador
                             AnimationConfiguration.staggeredList(
                               position: 3,
                               duration: const Duration(milliseconds: 600),
@@ -275,8 +266,6 @@ class _LoginSelectionScreenState extends State<LoginSelectionScreen>
                         ),
                       ),
                     ),
-
-                    // Footer
                     Expanded(
                       flex: 1,
                       child: AnimationConfiguration.staggeredList(
@@ -286,7 +275,7 @@ class _LoginSelectionScreenState extends State<LoginSelectionScreen>
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
-                              Text(
+                              AutoSizeText(
                                 'CarvajalAutotechApp v${AppConstants.appVersion}',
                                 style: Theme.of(context)
                                     .textTheme
@@ -294,6 +283,9 @@ class _LoginSelectionScreenState extends State<LoginSelectionScreen>
                                     ?.copyWith(
                                       color: AppTheme.greyMedium,
                                     ),
+                                maxLines: 1,
+                                minFontSize: 10,
+                                overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 24),
                             ],
@@ -353,7 +345,6 @@ class _LoginSelectionScreenState extends State<LoginSelectionScreen>
         ),
         child: Row(
           children: [
-            // Icono
             Container(
               width: 60,
               height: 60,
@@ -381,33 +372,34 @@ class _LoginSelectionScreenState extends State<LoginSelectionScreen>
                 color: AppTheme.white,
               ),
             ),
-
             const SizedBox(width: 20),
-
-            // Textos
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  AutoSizeText(
                     title,
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                           color: AppTheme.white,
                           fontWeight: FontWeight.w600,
                         ),
+                    maxLines: 1,
+                    minFontSize: 16,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
-                  Text(
+                  AutoSizeText(
                     subtitle,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: AppTheme.greyLight,
                         ),
+                    maxLines: 2,
+                    minFontSize: 12,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
             ),
-
-            // Flecha
             Icon(
               Icons.arrow_forward_ios,
               color: isStudent ? AppTheme.info : AppTheme.primaryRed,

@@ -341,14 +341,8 @@ class _StudentLoginScreenState extends State<StudentLoginScreen>
                                         // ¿Olvidaste contraseña?
                                         TextButton(
                                           onPressed: () {
-                                            // TODO: Implementar recuperación de contraseña
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(
-                                              const SnackBar(
-                                                content: Text(
-                                                    'Funcionalidad próximamente'),
-                                                backgroundColor: AppTheme.info,
-                                              ),
+                                            Navigator.of(context).pushNamed(
+                                              AppConstants.forgotPasswordRoute,
                                             );
                                           },
                                           child: Text(

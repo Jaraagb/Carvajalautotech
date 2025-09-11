@@ -1,4 +1,5 @@
 import 'package:carvajal_autotech/services/category_service.dart';
+import 'package:carvajal_autotech/services/student_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -7,6 +8,8 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/models/question_models.dart';
 import '../widgets/category_card.dart';
+import 'assign_students_screen.dart'; // Importar la pantalla para asignar estudiantes
+import 'package:carvajal_autotech/widgets/custom_notification_bar.dart';
 
 class CategoriesScreen extends StatefulWidget {
   const CategoriesScreen({Key? key}) : super(key: key);
@@ -22,6 +25,8 @@ class _CategoriesScreenState extends State<CategoriesScreen>
 
   final TextEditingController _searchController = TextEditingController();
   final CategoryService _categoryService = CategoryService(); // 👈 Servicio
+  final StudentService _studentService =
+      StudentService(); // Instancia del servicio
 
   List<Category> _categories = [];
   List<Category> _filteredCategories = [];
@@ -167,21 +172,18 @@ class _CategoriesScreenState extends State<CategoriesScreen>
 
   Widget _buildCategoriesList() {
     return AnimationLimiter(
-      child: GridView.builder(
+      child: ListView.builder(
         padding: const EdgeInsets.all(16),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          childAspectRatio: 0.8,
-        ),
         itemCount: _filteredCategories.length,
         itemBuilder: (context, index) {
-          return CategoryCard(
-            category: _filteredCategories[index],
-            onEdit: () => _showEditCategoryDialog(_filteredCategories[index]),
-            onDelete: () =>
-                _showDeleteCategoryDialog(_filteredCategories[index]),
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: CategoryCard(
+              category: _filteredCategories[index],
+              onEdit: () => _showEditCategoryDialog(_filteredCategories[index]),
+              onDelete: () =>
+                  _showDeleteCategoryDialog(_filteredCategories[index]),
+            ),
           );
         },
       ),
@@ -218,18 +220,46 @@ class _CategoriesScreenState extends State<CategoriesScreen>
       builder: (context) => AlertDialog(
         backgroundColor: AppTheme.lightBlack,
         title: Text(isEditing ? 'Editar Categoría' : 'Nueva Categoría'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(labelText: 'Nombre'),
-            ),
-            TextField(
-              controller: descriptionController,
-              decoration: const InputDecoration(labelText: 'Descripción'),
-            ),
-          ],
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(labelText: 'Nombre'),
+              ),
+              TextField(
+                controller: descriptionController,
+                decoration: const InputDecoration(labelText: 'Descripción'),
+              ),
+              const SizedBox(height: 16),
+              if (isEditing) // Mostrar el botón solo al editar
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    final result = await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => AssignStudentsScreen(
+                          categoryId: category.id, // Eliminado el operador `!`
+                        ),
+                      ),
+                    );
+
+                    if (result == true) {
+                      showCustomNotification(
+                        context,
+                        'Estudiantes asignados correctamente.',
+                        isSuccess: true,
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.group_add),
+                  label: const Text('Asignar Estudiantes'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryRed,
+                  ),
+                ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -240,7 +270,7 @@ class _CategoriesScreenState extends State<CategoriesScreen>
             onPressed: () async {
               if (isEditing) {
                 await _categoryService.updateCategory(
-                  categoryId: category!.id,
+                  categoryId: category.id,
                   name: nameController.text,
                   description: descriptionController.text,
                 );
@@ -256,6 +286,12 @@ class _CategoriesScreenState extends State<CategoriesScreen>
 
               Navigator.of(context).pop();
               _loadCategories(); // 👈 refresca lista
+
+              showCustomNotification(
+                context,
+                isEditing ? 'Categoría actualizada.' : 'Categoría creada.',
+                isSuccess: true,
+              );
             },
             child: Text(isEditing ? 'Actualizar' : 'Crear'),
           ),

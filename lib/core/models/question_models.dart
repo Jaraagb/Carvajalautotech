@@ -32,7 +32,7 @@ extension QuestionTypeExtension on QuestionType {
   }
 }
 
-class Category {
+class Category extends Equatable {
   final String id;
   final String name;
   final String description;
@@ -40,6 +40,7 @@ class Category {
   final int? questionCount;
   final bool isActive;
   final String createdBy; // ID del admin que la creó
+  final int? studentCount; // Número de alumnos inscritos
 
   Category({
     required this.id,
@@ -47,6 +48,7 @@ class Category {
     required this.createdAt,
     required this.description,
     this.questionCount,
+    this.studentCount, // Nuevo campo
     this.isActive = true,
     required this.createdBy,
   });
@@ -57,6 +59,7 @@ class Category {
     String? description,
     DateTime? createdAt,
     String? createdBy,
+    int? studentCount, // Nuevo campo
   }) {
     return Category(
       id: id ?? this.id,
@@ -64,6 +67,7 @@ class Category {
       description: description ?? this.description,
       createdAt: createdAt ?? this.createdAt,
       createdBy: createdBy ?? this.createdBy,
+      studentCount: studentCount ?? this.studentCount, // Nuevo campo
     );
   }
 
@@ -76,23 +80,56 @@ class Category {
       'created_by': createdBy,
       'is_active': isActive,
       'questionCount': questionCount,
+      'studentCount': studentCount, // Nuevo campo
     };
   }
 
   factory Category.fromJson(Map<String, dynamic> json) {
+    final questionCountData = json['question_count'];
+    int? questionCount;
+
+    if (questionCountData is List && questionCountData.isNotEmpty) {
+      final firstItem = questionCountData.first;
+      if (firstItem is Map<String, dynamic> &&
+          firstItem['question_count'] != null) {
+        questionCount = firstItem['question_count'] as int;
+      }
+    }
+
+    final studentCountData = json['student_count'];
+    int? studentCount;
+
+    if (studentCountData is List && studentCountData.isNotEmpty) {
+      final firstItem = studentCountData.first;
+      if (firstItem is Map<String, dynamic> &&
+          firstItem['student_count'] != null) {
+        studentCount = firstItem['student_count'] as int;
+      }
+    }
+
     return Category(
       id: json['id'] as String,
       name: json['name'] as String,
       description: json['description'] as String? ?? '',
       createdAt: DateTime.parse(json['created_at'] as String),
       createdBy: json['created_by'] as String? ?? '',
-      questionCount: json['questionCount'] as int?,
+      questionCount: questionCount,
       isActive: json['is_active'] as bool? ?? true,
+      studentCount: studentCount, // Ajustado para manejar estructura anidada
     );
   }
 
   @override
-  List<Object> get props => [id, name, description, createdAt, createdBy];
+  List<Object?> get props => [
+        id,
+        name,
+        description,
+        createdAt,
+        createdBy,
+        questionCount,
+        isActive,
+        studentCount, // <- nuevo campo
+      ];
 }
 
 class Question extends Equatable {
@@ -102,6 +139,7 @@ class Question extends Equatable {
   final String question;
   final List<String> options; // Para multiple choice
   final String correctAnswer;
+  final String? explanation; // Explicación de por qué es correcta
   final int? timeLimit; // En segundos, null si no hay límite
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -115,6 +153,7 @@ class Question extends Equatable {
     required this.question,
     required this.options,
     required this.correctAnswer,
+    this.explanation,
     this.timeLimit,
     required this.createdAt,
     required this.updatedAt,
@@ -131,6 +170,7 @@ class Question extends Equatable {
     String? question,
     List<String>? options,
     String? correctAnswer,
+    String? explanation,
     int? timeLimit,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -144,6 +184,7 @@ class Question extends Equatable {
       question: question ?? this.question,
       options: options ?? this.options,
       correctAnswer: correctAnswer ?? this.correctAnswer,
+      explanation: explanation ?? this.explanation,
       timeLimit: timeLimit ?? this.timeLimit,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -160,6 +201,7 @@ class Question extends Equatable {
       'question': question,
       'options': options,
       'correctAnswer': correctAnswer,
+      'explanation': explanation,
       'timeLimit': timeLimit,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
@@ -177,6 +219,7 @@ class Question extends Equatable {
       options:
           (json['options'] as List<dynamic>).map((e) => e.toString()).toList(),
       correctAnswer: json['correct_answer'] as String,
+      explanation: json['explanation'] as String?,
       timeLimit: json['time_limit'] as int?, // <- puede ser null
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
@@ -195,6 +238,7 @@ class Question extends Equatable {
               .toList() ??
           [],
       correctAnswer: map['correct_answer'] ?? '',
+      explanation: map['explanation'] as String?,
       timeLimit: map['time_limit'] as int?,
       createdAt: DateTime.parse(map['created_at']),
       updatedAt: DateTime.parse(map['updated_at']),
@@ -211,10 +255,12 @@ class Question extends Equatable {
         question,
         options,
         correctAnswer,
+        explanation,
         timeLimit,
         createdAt,
         updatedAt,
         createdBy,
+        imageUrl,
       ];
 }
 
@@ -228,6 +274,7 @@ class QuestionForm extends Equatable {
   final String correctAnswer;
   final int? timeLimit;
   final String? imageUrl;
+  final String? explanation;
 
   const QuestionForm({
     this.id,
@@ -238,6 +285,7 @@ class QuestionForm extends Equatable {
     required this.correctAnswer,
     this.timeLimit,
     this.imageUrl,
+    this.explanation,
   });
 
   bool get isEditing => id != null;
@@ -252,6 +300,7 @@ class QuestionForm extends Equatable {
       'correctAnswer': correctAnswer,
       'timeLimit': timeLimit,
       'image_url': imageUrl,
+      'explanation': explanation,
     };
   }
 
@@ -265,6 +314,7 @@ class QuestionForm extends Equatable {
         correctAnswer,
         timeLimit,
         imageUrl,
+        explanation,
       ];
 }
 

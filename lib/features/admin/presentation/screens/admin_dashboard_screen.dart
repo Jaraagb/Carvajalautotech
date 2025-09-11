@@ -128,7 +128,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                     //   ),
                     // ),
 
-                    const SizedBox(height: 32),
+                    // const SizedBox(height: 32),
 
                     // Acciones
                     AnimationConfiguration.staggeredList(

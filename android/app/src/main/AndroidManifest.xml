@@ -6,6 +6,8 @@
 
     <!-- Para Android 12 e inferiores -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.INTERNET"/>
+
 
     <!-- Para Android 13+ (API 33) -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
@@ -17,6 +19,7 @@
 
 
     <application
+        android:usesCleartextTraffic="true"
         android:label="carvajal_autotech"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">

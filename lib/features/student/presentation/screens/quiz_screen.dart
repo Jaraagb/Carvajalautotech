@@ -1,11 +1,11 @@
-// lib/features/quiz/presentation/quiz_screen.dart
 import 'dart:async';
 import 'package:carvajal_autotech/services/student_answer_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
-
+import 'package:auto_size_text/auto_size_text.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/models/question_models.dart';
@@ -33,10 +33,8 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
 
   List<Question> _questions = [];
   int _currentQuestionIndex = 0;
-  Map<String, String> _answers =
-      {}; // questionId -> answer (persistir selección)
-  Map<String, TextEditingController> _freeTextControllers =
-      {}; // mantener texto libre
+  Map<String, String> _answers = {};
+  Map<String, TextEditingController> _freeTextControllers = {};
   Timer? _questionTimer;
   int _timeRemaining = 0;
   DateTime? _questionStartTime;
@@ -79,8 +77,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       final response = await Supabase.instance.client
           .from('unanswered_questions')
           .select('*')
-          .eq('category_id',
-              widget.categoryId as Object) // siempre aplica filtro
+          .eq('category_id', widget.categoryId as Object)
           .order('created_at', ascending: false);
 
       final fetchedQuestions =
@@ -109,7 +106,6 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     if (_currentQuestionIndex < _questions.length) {
       final question = _questions[_currentQuestionIndex];
 
-      // asegurarse de tener controlador para texto libre
       if (question.type == QuestionType.freeText) {
         _freeTextControllers.putIfAbsent(
           question.id,
@@ -122,14 +118,12 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
         _questionStartTime = DateTime.now();
       });
 
-      // Solo iniciar timer si la pregunta tiene timeLimit
       if (question.timeLimit != null) {
         setState(() {
           _timeRemaining = question.timeLimit!;
         });
         _startTimer();
       } else {
-        // cancelar timer si existía
         _questionTimer?.cancel();
         _timerController.reset();
         setState(() => _timeRemaining = 0);
@@ -156,7 +150,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
 
   void _handleTimeUp() {
     if (!_isAnswered) {
-      _handleAnswer(''); // respuesta vacía por tiempo agotado
+      _handleAnswer('');
     }
   }
 
@@ -179,7 +173,6 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
             .inSeconds
             .clamp(0, 999);
 
-    // determinar isCorrect solo por comparación simple (puedes ajustar lógica)
     final isCorrect = answer.trim().toLowerCase() ==
         question.correctAnswer.trim().toLowerCase();
 
@@ -200,7 +193,6 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       }
     }
 
-    // esperar 1.2s para animación/feedback (no mostrar correct/incorrect here)
     Future.delayed(const Duration(milliseconds: 1200), _nextQuestion);
   }
 
@@ -215,13 +207,36 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     }
   }
 
-  void _finishQuiz() {
+  void _finishQuiz() async {
     int correctAnswers = 0;
     for (var question in _questions) {
       final userAnswer = _answers[question.id] ?? '';
       if (userAnswer.toLowerCase() == question.correctAnswer.toLowerCase()) {
         correctAnswers++;
       }
+    }
+
+    // Verificar si esta categoría está publicada para el estudiante actual
+    bool isPublished = false;
+    try {
+      final client = Supabase.instance.client;
+      final user = client.auth.currentUser;
+
+      if (user != null && widget.categoryId != null) {
+        final response = await client
+            .from('student_categories')
+            .select('published')
+            .eq('student_id', user.id)
+            .eq('category_id', widget.categoryId!)
+            .maybeSingle();
+
+        isPublished = response?['published'] as bool? ?? false;
+        print(
+            'Estado de publicación para categoría ${widget.categoryId}: $isPublished');
+      }
+    } catch (e) {
+      print('Error verificando estado de publicación: $e');
+      isPublished = false;
     }
 
     final results = {
@@ -234,9 +249,483 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       'categoryId': widget.categoryId,
       'answers': _answers,
       'questions': _questions,
+      'published': isPublished, // Estado real de publicación de la categoría
     };
 
     AppRouter.navigateToQuizResult(context, results);
+  }
+
+  Future<void> _openImageUrl(String url) async {
+    try {
+      final uri = Uri.parse(url);
+
+      if (!uri.hasScheme) {
+        throw 'URL inválida: no tiene esquema HTTP/HTTPS';
+      }
+
+      bool opened = false;
+
+      try {
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(
+            uri,
+            mode: LaunchMode.externalApplication,
+          );
+          opened = true;
+        }
+      } catch (e) {
+        debugPrint('Falló modo externo: $e');
+      }
+
+      if (!opened) {
+        try {
+          await launchUrl(
+            uri,
+            mode: LaunchMode.inAppWebView,
+            webViewConfiguration: const WebViewConfiguration(
+              enableJavaScript: true,
+              enableDomStorage: true,
+            ),
+          );
+          opened = true;
+        } catch (e) {
+          debugPrint('Falló modo interno: $e');
+        }
+      }
+
+      if (!opened) {
+        try {
+          await launchUrl(uri, mode: LaunchMode.platformDefault);
+          opened = true;
+        } catch (e) {
+          debugPrint('Falló modo platformDefault: $e');
+        }
+      }
+
+      if (!opened) {
+        throw 'No se pudo abrir la URL con ningún método';
+      }
+    } catch (e) {
+      debugPrint('Error completo abriendo imagen: $e');
+      if (mounted) {
+        _showImageErrorDialog(url, e.toString());
+      }
+    }
+  }
+
+  void _showImageErrorDialog(String url, String error) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.lightBlack,
+        title: const Text(
+          'No se pudo abrir la imagen',
+          style: TextStyle(color: AppTheme.white),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Prueba las siguientes opciones:',
+              style: TextStyle(color: AppTheme.greyLight),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              '• Copiar URL y pegar en el navegador',
+              style: TextStyle(color: AppTheme.greyLight, fontSize: 14),
+            ),
+            const Text(
+              '• Ver imagen en pantalla completa',
+              style: TextStyle(color: AppTheme.greyLight, fontSize: 14),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Error: ${error.length > 50 ? error.substring(0, 50) + "..." : error}',
+              style: const TextStyle(
+                color: AppTheme.error,
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancelar',
+                style: TextStyle(color: AppTheme.greyLight)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _copyUrlToClipboard(url);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.info),
+            child: const Text('Copiar URL'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _showFullScreenImage(url);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.success),
+            child: const Text('Ver completa'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImageSection(Question question) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppTheme.lightBlack.withOpacity(0.8),
+            AppTheme.greyDark.withOpacity(0.6),
+          ],
+        ),
+        border: Border.all(
+          color: AppTheme.info.withOpacity(0.2),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        children: [
+          GestureDetector(
+            onTap: () => _showFullScreenImage(question.imageUrl!),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.primaryBlack.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(16),
+                      topRight: Radius.circular(16),
+                    ),
+                    child: Image.network(
+                      question.imageUrl!,
+                      height: 200,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Container(
+                          height: 200,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                AppTheme.greyDark.withOpacity(0.8),
+                                AppTheme.lightBlack.withOpacity(0.8),
+                              ],
+                            ),
+                          ),
+                          child: Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                CircularProgressIndicator(
+                                  color: AppTheme.info,
+                                  strokeWidth: 3,
+                                  value: loadingProgress.expectedTotalBytes !=
+                                          null
+                                      ? loadingProgress.cumulativeBytesLoaded /
+                                          loadingProgress.expectedTotalBytes!
+                                      : null,
+                                ),
+                                const SizedBox(height: 12),
+                                const Text(
+                                  'Cargando imagen...',
+                                  style: TextStyle(
+                                    color: AppTheme.greyLight,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          height: 200,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                AppTheme.error.withOpacity(0.1),
+                                AppTheme.greyDark.withOpacity(0.8),
+                              ],
+                            ),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: const [
+                              Icon(Icons.broken_image,
+                                  color: AppTheme.error, size: 48),
+                              SizedBox(height: 8),
+                              Text(
+                                'Error al cargar imagen',
+                                style: TextStyle(
+                                    color: AppTheme.greyLight, fontSize: 14),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  Positioned(
+                    top: 12,
+                    right: 12,
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryBlack.withOpacity(0.8),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: AppTheme.info.withOpacity(0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.zoom_in,
+                        color: AppTheme.white,
+                        size: 18,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          gradient: LinearGradient(
+                            colors: [
+                              AppTheme.info,
+                              AppTheme.info.withOpacity(0.8),
+                            ],
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppTheme.info.withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: ElevatedButton.icon(
+                          onPressed: () =>
+                              _showFullScreenImage(question.imageUrl!),
+                          icon: const Icon(Icons.fullscreen_rounded, size: 18),
+                          label: const Text(
+                            'Ampliar',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            foregroundColor: AppTheme.white,
+                            shadowColor: Colors.transparent,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 3,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          gradient: LinearGradient(
+                            colors: [
+                              AppTheme.success,
+                              AppTheme.success.withOpacity(0.8),
+                            ],
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppTheme.success.withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: ElevatedButton.icon(
+                          onPressed: () => _openImageUrl(question.imageUrl!),
+                          icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                          label: const Text(
+                            'Abrir',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            foregroundColor: AppTheme.white,
+                            shadowColor: Colors.transparent,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        gradient: LinearGradient(
+                          colors: [
+                            AppTheme.warning,
+                            AppTheme.warning.withOpacity(0.8),
+                          ],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppTheme.warning.withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: ElevatedButton(
+                        onPressed: () =>
+                            _copyUrlToClipboard(question.imageUrl!),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          foregroundColor: AppTheme.white,
+                          shadowColor: Colors.transparent,
+                          padding: const EdgeInsets.all(14),
+                          minimumSize: const Size(50, 50),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Icon(Icons.copy_rounded, size: 18),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppTheme.info.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: AppTheme.info.withOpacity(0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Text(
+                    question.categoryId.toUpperCase(),
+                    style: const TextStyle(
+                      color: AppTheme.info,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _copyUrlToClipboard(String url) async {
+    try {
+      await Clipboard.setData(ClipboardData(text: url));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('URL copiada al portapapeles'),
+            backgroundColor: AppTheme.success,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error copiando URL: $e');
+    }
+  }
+
+  void _showFullScreenImage(String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog.fullscreen(
+        backgroundColor: AppTheme.primaryBlack,
+        child: Stack(
+          children: [
+            Center(
+              child: InteractiveViewer(
+                child: Image.network(
+                  imageUrl,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) => Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.error, color: AppTheme.error, size: 64),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Error al cargar imagen',
+                        style: TextStyle(color: AppTheme.white, fontSize: 18),
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: () => _openImageUrl(imageUrl),
+                        child: const Text('Abrir en navegador'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 50,
+              right: 20,
+              child: IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.close, color: AppTheme.white, size: 30),
+                style: IconButton.styleFrom(
+                  backgroundColor: AppTheme.primaryBlack.withOpacity(0.8),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -245,47 +734,41 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     _timerController.dispose();
     _questionTimer?.cancel();
 
-    // dispose controllers
     for (final c in _freeTextControllers.values) {
       c.dispose();
     }
     super.dispose();
   }
 
-  // Abre la imagen en el navegador (para descargar)
-  Future<void> _openImageUrl(String url) async {
-    try {
-      final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('No se pudo abrir la imagen'),
-            backgroundColor: AppTheme.error,
-          ));
-        }
-      }
-    } catch (e) {
-      debugPrint('Error abriendo URL: $e');
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const Scaffold(
-        backgroundColor: AppTheme.primaryBlack,
-        body: Center(child: CircularProgressIndicator(color: AppTheme.info)),
+        body: Center(child: CircularProgressIndicator()),
       );
     }
 
     if (_questions.isEmpty) {
-      return const Scaffold(
+      return Scaffold(
         backgroundColor: AppTheme.primaryBlack,
+        appBar: AppBar(
+          backgroundColor: AppTheme.primaryBlack,
+          title: const Text(
+            'Quiz',
+            style:
+                TextStyle(color: AppTheme.white, fontWeight: FontWeight.w600),
+          ),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: AppTheme.white),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ),
         body: Center(
-            child: Text('No hay preguntas disponibles',
-                style: TextStyle(color: AppTheme.white))),
+          child: Text(
+            'Aún no hay preguntas disponibles.',
+            style: TextStyle(fontSize: 18, color: AppTheme.greyDark),
+          ),
+        ),
       );
     }
 
@@ -297,43 +780,26 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       appBar: _buildAppBar(progress),
       body: AnimatedBuilder(
         animation: _animationController,
-        builder: (context, child) => FadeTransition(
-          opacity: _fadeAnimation,
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              return SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    minHeight: constraints.maxHeight - 32, // Resta el padding
-                  ),
-                  child: IntrinsicHeight(
-                    child: AnimationLimiter(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          // Timer (solo si la pregunta tiene timeLimit)
-                          if (currentQuestion.hasTimeLimit)
-                            _buildTimerSection(),
-                          if (currentQuestion.hasTimeLimit)
-                            const SizedBox(height: 24),
-
-                          _buildQuestionSection(currentQuestion),
-                          const SizedBox(height: 32),
-
-                          // ✅ SOLUCIÓN: Cambié Expanded por Flexible
-                          Flexible(
-                            child: _buildAnswerSection(currentQuestion),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+        builder: (context, child) {
+          return FadeTransition(
+            opacity: _fadeAnimation,
+            child: SingleChildScrollView(
+              // 🔹 Solución: Agregar desplazamiento
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  children: [
+                    _buildTimerSection(),
+                    const SizedBox(height: 16),
+                    _buildQuestionSection(currentQuestion),
+                    const SizedBox(height: 16),
+                    _buildAnswerSection(currentQuestion),
+                  ],
                 ),
-              );
-            },
-          ),
-        ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -363,7 +829,6 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildTimerSection() {
-    // Si la pregunta no tiene límite, no mostrar
     if (_timeRemaining <= 0) {
       return const SizedBox.shrink();
     }
@@ -439,7 +904,6 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Tipo
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
@@ -464,49 +928,11 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
               ],
             ),
           ),
-
           const SizedBox(height: 12),
-
-          // Imagen (si existe)
           if (question.imageUrl != null && question.imageUrl!.isNotEmpty) ...[
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.network(
-                question.imageUrl!,
-                height: 180,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (context, _, __) => Container(
-                  height: 180,
-                  color: AppTheme.greyDark,
-                  child: const Center(
-                      child: Icon(Icons.broken_image,
-                          color: AppTheme.greyLight, size: 48)),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                ElevatedButton.icon(
-                  onPressed: () => _openImageUrl(question.imageUrl!),
-                  icon: const Icon(Icons.open_in_new),
-                  label: const Text('Abrir imagen'),
-                  style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryRed),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  question.categoryId.toUpperCase(),
-                  style:
-                      const TextStyle(color: AppTheme.greyMedium, fontSize: 12),
-                ),
-              ],
-            ),
+            _buildImageSection(question),
             const SizedBox(height: 12),
           ],
-
-          // Pregunta texto
           Text(question.question,
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     color: AppTheme.white,
@@ -601,7 +1027,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
 
   Widget _buildTrueFalseAnswers(Question question) {
     return Column(
-      mainAxisSize: MainAxisSize.min, // ✅ Solo usa el espacio mínimo necesario
+      mainAxisSize: MainAxisSize.min,
       children: [
         Row(
           children: [
@@ -656,7 +1082,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
         () => TextEditingController(text: _answers[question.id] ?? ''));
 
     return Column(
-      mainAxisSize: MainAxisSize.min, // ✅ Solo usa el espacio mínimo necesario
+      mainAxisSize: MainAxisSize.min,
       children: [
         TextField(
           controller: controller,

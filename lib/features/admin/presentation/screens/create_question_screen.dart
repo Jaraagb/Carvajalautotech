@@ -29,6 +29,7 @@ class _CreateQuestionScreenState extends State<CreateQuestionScreen>
 
   final _formKey = GlobalKey<FormState>();
   final _questionController = TextEditingController();
+  final _explanationController = TextEditingController();
   final _timeLimitController = TextEditingController();
   final List<TextEditingController> _optionControllers = [];
 
@@ -103,6 +104,7 @@ class _CreateQuestionScreenState extends State<CreateQuestionScreen>
 
       setState(() {
         _questionController.text = question.question;
+        _explanationController.text = question.explanation ?? '';
         _selectedType = question.type;
         _selectedCategory = question.categoryId;
         _hasTimeLimit = question.timeLimit != null;
@@ -148,6 +150,7 @@ class _CreateQuestionScreenState extends State<CreateQuestionScreen>
   void dispose() {
     _animationController.dispose();
     _questionController.dispose();
+    _explanationController.dispose();
     _timeLimitController.dispose();
     for (var c in _optionControllers) c.dispose();
     super.dispose();
@@ -270,6 +273,9 @@ class _CreateQuestionScreenState extends State<CreateQuestionScreen>
             ? int.tryParse(_timeLimitController.text.trim())
             : null,
         imageUrl: _imageUrl,
+        explanation: _explanationController.text.trim().isNotEmpty
+            ? _explanationController.text.trim()
+            : null,
       );
 
       if (widget.questionId == null) {
@@ -334,6 +340,8 @@ class _CreateQuestionScreenState extends State<CreateQuestionScreen>
                     _buildCategorySelector(),
                     const SizedBox(height: 20),
                     _buildQuestionField(),
+                    const SizedBox(height: 20),
+                    _buildExplanationField(),
                     const SizedBox(height: 20),
                     _buildImageSection(),
                     const SizedBox(height: 20),
@@ -471,6 +479,15 @@ class _CreateQuestionScreenState extends State<CreateQuestionScreen>
           if (v!.length < 10) return 'Mínimo 10 caracteres';
           return null;
         },
+      );
+
+  Widget _buildExplanationField() => CustomTextField(
+        controller: _explanationController,
+        label: 'Explicación (opcional)',
+        hint: 'Explica por qué la respuesta es correcta...',
+        maxLines: 4,
+        maxLength: 500,
+        validator: null, // Campo opcional
       );
 
   Widget _buildImageSection() {

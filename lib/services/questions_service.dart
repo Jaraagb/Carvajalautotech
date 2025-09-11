@@ -59,6 +59,7 @@ class QuestionsService {
             'correct_answer': form.correctAnswer,
             'time_limit': form.timeLimit,
             'image_url': form.imageUrl, // 👈 nuevo
+            'explanation': form.explanation,
             'created_by': _client.auth.currentUser!.id,
           })
           .select()
@@ -89,6 +90,7 @@ class QuestionsService {
             'correct_answer': form.correctAnswer,
             'time_limit': form.timeLimit,
             'image_url': form.imageUrl, // 👈 nuevo
+            'explanation': form.explanation,
           })
           .eq('id', form.id!)
           .select()

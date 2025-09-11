@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../services/student_service.dart';
 
 class StudentDetailScreen extends StatefulWidget {
   final String studentId;
@@ -18,12 +19,14 @@ class StudentDetailScreen extends StatefulWidget {
 
 class _StudentDetailScreenState extends State<StudentDetailScreen> {
   final supabase = Supabase.instance.client;
+  final studentService = StudentService();
 
   bool _loading = true;
   String? _error;
 
   List<Map<String, dynamic>> _byCategory = [];
   List<Map<String, dynamic>> _answers = [];
+  List<Map<String, dynamic>> _categoryPublicationStatus = [];
 
   // UI filter
   String? _selectedCategoryId; // null = all
@@ -36,6 +39,12 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
   void initState() {
     super.initState();
     _loadStudentDetail();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Mover cualquier lógica que dependa del contexto aquí
   }
 
   // ----- Helper to interpret different representations of "true" -----
@@ -62,6 +71,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       _error = null;
       _byCategory = [];
       _answers = [];
+      _categoryPublicationStatus = [];
       _selectedCategoryId = null;
       _isPublished = false;
     });
@@ -80,7 +90,11 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
           .eq('student_id', widget.studentId)
           .order('answered_at', ascending: false);
 
-      // 3) estado de publicación: tabla student_results_publish
+      // 3) estado de publicación por categoría: nueva vista
+      final categoryPublicationStatus = await studentService
+          .getStudentCategoryPublicationStatus(widget.studentId);
+
+      // 4) estado de publicación general (mantener para compatibilidad)
       final dynamic pubRes = await supabase
           .from('student_results_publish')
           .select('published')
@@ -152,6 +166,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       setState(() {
         _byCategory = catList;
         _answers = ansList;
+        _categoryPublicationStatus = categoryPublicationStatus;
         _isPublished = published;
       });
     } catch (e, st) {
@@ -175,17 +190,18 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
   // quick aggregate
   int get totalAnswers => _answers.length;
 
-  Future<void> _togglePublish() async {
-    final newState = !_isPublished;
+  /// Publica o despublica una categoría específica
+  Future<void> _toggleCategoryPublish(
+      String categoryId, String categoryName, bool currentState) async {
+    final newState = !currentState;
 
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(
-            newState ? 'Publicar calificación' : 'Despublicar calificación'),
+        title: Text(newState ? 'Publicar categoría' : 'Despublicar categoría'),
         content: Text(newState
-            ? '¿Confirmas que deseas publicar las calificaciones para este estudiante?'
-            : '¿Confirmas que deseas retirar la publicación de las calificaciones?'),
+            ? '¿Confirmas que deseas publicar las calificaciones de "$categoryName" para este estudiante?'
+            : '¿Confirmas que deseas retirar la publicación de las calificaciones de "$categoryName"?'),
         actions: [
           TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
@@ -202,75 +218,157 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     setState(() => _loadingPublish = true);
 
     try {
-      final row = {
-        'student_id': widget.studentId,
-        'published': newState,
-        'published_at': DateTime.now().toUtc().toIso8601String(),
-      };
+      final published = await studentService.toggleCategoryPublication(
+          widget.studentId, categoryId, newState);
 
-      // CORRECCIÓN: onConflict debe ser un String con el nombre de la columna
-      final dynamic upsertRes = await supabase
-          .from('student_results_publish')
-          .upsert(row, onConflict: 'student_id') // <-- aquí la corrección
-          .select()
-          .maybeSingle();
-
-      // Normalizar respuesta a bool
-      bool published = newState;
-      if (upsertRes != null) {
-        // upsertRes puede ser Map, List o PostgrestResponse-like
-        if (upsertRes is Map && upsertRes.containsKey('published')) {
-          final p = upsertRes['published'];
-          if (p is bool)
-            published = p;
-          else {
-            final s = p?.toString().toLowerCase();
-            published = (s == 'true' || s == 't' || s == '1');
-          }
-        } else if (upsertRes is List && upsertRes.isNotEmpty) {
-          final m = Map<String, dynamic>.from(upsertRes[0] as Map);
-          final p = m['published'];
-          if (p is bool)
-            published = p;
-          else {
-            final s = p?.toString().toLowerCase();
-            published = (s == 'true' || s == 't' || s == '1');
-          }
-        } else {
-          // fallback: si viene otra cosa (p.ej. PostgrestResponse), intentar extraer .data
-          try {
-            final maybeData = (upsertRes as dynamic).data;
-            if (maybeData is Map && maybeData.containsKey('published')) {
-              final p = maybeData['published'];
-              if (p is bool)
-                published = p;
-              else {
-                final s = p?.toString().toLowerCase();
-                published = (s == 'true' || s == 't' || s == '1');
-              }
-            }
-          } catch (_) {}
-        }
-      }
-
+      // Actualizar el estado local
       setState(() {
-        _isPublished = published;
+        final index = _categoryPublicationStatus
+            .indexWhere((cat) => cat['category_id'] == categoryId);
+        if (index != -1) {
+          _categoryPublicationStatus[index]['published'] = published;
+        }
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(published
-              ? 'Calificación publicada'
-              : 'Calificación despublicada'),
+              ? 'Categoría "$categoryName" publicada'
+              : 'Categoría "$categoryName" despublicada'),
           backgroundColor: AppTheme.success,
         ),
       );
     } catch (e, st) {
-      debugPrint('Error toggling publish: $e\n$st');
+      debugPrint('Error toggling category publish: $e\n$st');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
             content: Text('Error al actualizar el estado: $e'),
             backgroundColor: AppTheme.primaryRed),
+      );
+    } finally {
+      setState(() => _loadingPublish = false);
+    }
+  }
+
+  /// Método para obtener el estado de publicación de una categoría
+  bool _getCategoryPublicationState(String categoryId) {
+    final category = _categoryPublicationStatus.firstWhere(
+        (cat) => cat['category_id'] == categoryId,
+        orElse: () => {'published': false});
+    return category['published'] as bool? ?? false;
+  }
+
+  /// Muestra el diálogo para gestionar la publicación por categorías
+  void _showPublicationDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Gestionar Publicación por Categorías'),
+        content: Container(
+          width: double.maxFinite,
+          child: _categoryPublicationStatus.isEmpty
+              ? const Text('No hay categorías asignadas para este estudiante.')
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Selecciona las categorías que deseas publicar para este estudiante:',
+                      style: TextStyle(fontSize: 14),
+                    ),
+                    const SizedBox(height: 16),
+                    ..._categoryPublicationStatus
+                        .map((category) =>
+                            _buildCategoryPublicationTile(category))
+                        .toList(),
+                  ],
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cerrar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Construye cada item de categoría con su switch de publicación
+  Widget _buildCategoryPublicationTile(Map<String, dynamic> category) {
+    final categoryId = category['category_id']?.toString() ?? '';
+    final categoryName = category['category_name']?.toString() ?? 'Sin nombre';
+    final isPublished = category['published'] as bool? ?? false;
+    final totalAnswers = category['total_answers'] as int? ?? 0;
+    final successPercentage = category['success_percentage'] as num? ?? 0;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(color: AppTheme.greyLight.withOpacity(0.3)),
+        borderRadius: BorderRadius.circular(8),
+        color: isPublished
+            ? AppTheme.success.withOpacity(0.1)
+            : AppTheme.greyLight.withOpacity(0.1),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  categoryName,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Respuestas: $totalAnswers | Aciertos: ${successPercentage.toStringAsFixed(1)}%',
+                  style: TextStyle(
+                    color: AppTheme.greyLight,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: isPublished,
+            onChanged: totalAnswers > 0
+                ? (value) async {
+                    await _toggleCategoryPublish(
+                        categoryId, categoryName, isPublished);
+                    Navigator.of(context).pop();
+                    _showPublicationDialog(); // Reabrir el diálogo para mostrar cambios
+                  }
+                : null,
+            activeColor: AppTheme.success,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _publishCategory(String categoryId, String categoryName) async {
+    setState(() => _loadingPublish = true);
+    try {
+      // Usar el nuevo método que actualiza student_categories
+      await studentService.toggleCategoryPublication(
+          widget.studentId, categoryId, true);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text('Categoría "$categoryName" publicada correctamente')),
+      );
+
+      // Reload details to reflect changes
+      await _loadStudentDetail();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error publicando categoría: $e')),
       );
     } finally {
       setState(() => _loadingPublish = false);
@@ -372,25 +470,20 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                     style: TextButton.styleFrom(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 6),
-                      backgroundColor: _isPublished
-                          ? AppTheme.success.withOpacity(0.12)
-                          : AppTheme.primaryRed.withOpacity(0.12),
+                      backgroundColor: AppTheme.primaryRed.withOpacity(0.12),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8)),
                     ),
-                    onPressed: _togglePublish,
-                    icon: Icon(
-                      _isPublished ? Icons.lock_open : Icons.lock,
+                    onPressed: () => _showPublicationDialog(),
+                    icon: const Icon(
+                      Icons.publish,
                       size: 18,
-                      color:
-                          _isPublished ? AppTheme.success : AppTheme.primaryRed,
+                      color: AppTheme.primaryRed,
                     ),
-                    label: Text(
-                      _isPublished ? 'Publicado' : 'Publicar',
+                    label: const Text(
+                      'Gestionar Publicación',
                       style: TextStyle(
-                        color: _isPublished
-                            ? AppTheme.success
-                            : AppTheme.primaryRed,
+                        color: AppTheme.primaryRed,
                         fontSize: 12,
                       ),
                     ),
@@ -463,6 +556,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     final correct = rows.where((r) => _isCorrectValue(r['is_correct'])).length;
     final total = rows.length;
     final accuracy = total == 0 ? 0.0 : (correct / total) * 100.0;
+    final isPublished = _getCategoryPublicationState(catId);
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 10),
@@ -472,9 +566,51 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
           Row(
             children: [
               Expanded(
-                  child: Text(name,
-                      style: const TextStyle(
-                          color: AppTheme.white, fontWeight: FontWeight.w700))),
+                child: Row(
+                  children: [
+                    Text(name,
+                        style: const TextStyle(
+                            color: AppTheme.white,
+                            fontWeight: FontWeight.w700)),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: isPublished
+                            ? AppTheme.success.withOpacity(0.2)
+                            : AppTheme.greyLight.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            isPublished
+                                ? Icons.visibility
+                                : Icons.visibility_off,
+                            size: 12,
+                            color: isPublished
+                                ? AppTheme.success
+                                : AppTheme.greyLight,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            isPublished ? 'Publicado' : 'No publicado',
+                            style: TextStyle(
+                              color: isPublished
+                                  ? AppTheme.success
+                                  : AppTheme.greyLight,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               Text('${accuracy.toStringAsFixed(1)}%',
                   style: const TextStyle(color: AppTheme.greyLight)),
             ],
@@ -531,42 +667,82 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
   }
 
   @override
+  void dispose() {
+    // Asegurarse de no acceder al contexto aquí
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.primaryBlack,
       appBar: AppBar(
-        backgroundColor: AppTheme.primaryBlack,
-        title: Text(widget.studentName ?? 'Detalle Estudiante',
-            style: const TextStyle(color: AppTheme.white)),
+        title: Text(widget.studentName ?? 'Detalle del Estudiante'),
       ),
       body: _loading
-          ? const Center(
-              child: CircularProgressIndicator(color: AppTheme.primaryRed))
+          ? Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(
-                  child: Text('Error: $_error',
-                      style: const TextStyle(color: AppTheme.primaryRed)))
-              : SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildHeader(),
-                      const SizedBox(height: 16),
-                      Text('Filtrar por categoría',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(
-                                  color: AppTheme.white,
-                                  fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 8),
-                      _buildCategoryChips(),
-                      const SizedBox(height: 16),
-                      _buildAnswersSections(),
-                      const SizedBox(height: 24),
-                    ],
-                  ),
+              ? Center(child: Text('Error: $_error'))
+              : Column(
+                  children: [
+                    Expanded(
+                      child: ListView.builder(
+                        itemCount: _byCategory.length,
+                        itemBuilder: (context, index) {
+                          final category = _byCategory[index];
+                          final categoryId = category['category_id'];
+                          final categoryName = category['category_name'];
+                          final answers = _answersGrouped[categoryId] ?? [];
+                          final isPublished = category['published'] == true;
+
+                          return Card(
+                            margin: const EdgeInsets.all(8.0),
+                            child: ExpansionTile(
+                              title: Text(categoryName ?? 'Sin categoría'),
+                              children: [
+                                ...answers.map((answer) {
+                                  return ListTile(
+                                    title:
+                                        Text(answer['selected_answer'] ?? '—'),
+                                    subtitle: Text(
+                                        'Correcta: ${_isCorrectValue(answer['is_correct']) ? "Sí" : "No"}'),
+                                    onTap: () => _openQuestionModal(answer),
+                                  );
+                                }).toList(),
+                                ElevatedButton(
+                                  onPressed: isPublished
+                                      ? null
+                                      : () async {
+                                          await _publishCategory(
+                                              categoryId, categoryName);
+                                          if (mounted) {
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                    'Categoría "$categoryName" publicada correctamente.'),
+                                              ),
+                                            );
+                                          }
+                                          await _loadStudentDetail();
+                                        },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: isPublished
+                                        ? Colors.green
+                                        : Theme.of(context).primaryColor,
+                                  ),
+                                  child: Text(
+                                    isPublished
+                                        ? 'Categoría publicada'
+                                        : 'Publicar esta categoría',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                 ),
     );
   }

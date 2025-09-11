@@ -60,7 +60,6 @@ class _StatisticsScreenState extends State<StatisticsScreen>
     try {
       // 1️⃣ Resumen general
       final overallRes = await supabase.from('stats_overall').select();
-      // Usando la vista pública que ya existe en schema public (app_users)
       final totalStudentsRes = await supabase.from('app_users').select('id');
       final totalStudents = (totalStudentsRes as List).length;
 
@@ -77,10 +76,10 @@ class _StatisticsScreenState extends State<StatisticsScreen>
 
       _categoryStats = categoryRes.map<Map<String, dynamic>>((c) {
         return {
-          'name': c['category_name'],
-          'questions': c['total_questions'],
-          'answers': c['total_answers'],
-          'accuracy': c['average_accuracy'],
+          'name': c['category_name'] ?? 'Sin categoría',
+          'questions': c['total_questions'] ?? 0,
+          'answers': c['total_answers'] ?? 0,
+          'accuracy': c['accuracy'] ?? 0.0,
           'color': AppTheme.info, // puedes mapear por categoría si quieres
         };
       }).toList();
@@ -145,12 +144,12 @@ class _StatisticsScreenState extends State<StatisticsScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildOverallStats(),
-                          const SizedBox(height: 16),
+                          // _buildOverallStats(),
+                          // const SizedBox(height: 16),
                           _buildStudentsCard(), // <-- nuevo widget
                           const SizedBox(height: 32),
-                          _buildCategoryStats(),
-                          const SizedBox(height: 32),
+                          // _buildCategoryStats(),
+                          // const SizedBox(height: 32),
                           _buildTopStudents(),
                           const SizedBox(height: 32),
                           _buildTrendsChart(),
@@ -184,55 +183,55 @@ class _StatisticsScreenState extends State<StatisticsScreen>
     );
   }
 
-  Widget _buildOverallStats() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Resumen General',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: AppTheme.white,
-                fontWeight: FontWeight.w600,
-              ),
-        ),
-        const SizedBox(height: 16),
-        GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 2,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          childAspectRatio: 1.2,
-          children: [
-            _buildStatCard(
-              'Estudiantes Totales',
-              _overallStats!['totalStudents'].toString(),
-              Icons.school_outlined,
-              AppTheme.info,
-            ),
-            _buildStatCard(
-              'Preguntas Creadas',
-              _overallStats!['totalQuestions'].toString(),
-              Icons.quiz_outlined,
-              AppTheme.success,
-            ),
-            _buildStatCard(
-              'Respuestas Totales',
-              _overallStats!['totalAnswers'].toString(),
-              Icons.question_answer_outlined,
-              AppTheme.warning,
-            ),
-            _buildStatCard(
-              'Precisión Promedio',
-              '${_overallStats!['averageAccuracy']}%',
-              Icons.trending_up_outlined,
-              AppTheme.primaryRed,
-            ),
-          ],
-        ),
-      ],
-    );
-  }
+  // Widget _buildOverallStats() {
+  //   return Column(
+  //     crossAxisAlignment: CrossAxisAlignment.start,
+  //     children: [
+  //       Text(
+  //         'Resumen General',
+  //         style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+  //               color: AppTheme.white,
+  //               fontWeight: FontWeight.w600,
+  //             ),
+  //       ),
+  //       const SizedBox(height: 16),
+  //       GridView.count(
+  //         shrinkWrap: true,
+  //         physics: const NeverScrollableScrollPhysics(),
+  //         crossAxisCount: 2,
+  //         crossAxisSpacing: 16,
+  //         mainAxisSpacing: 16,
+  //         childAspectRatio: 1.2,
+  //         children: [
+  //           _buildStatCard(
+  //             'Estudiantes Totales',
+  //             _overallStats!['totalStudents'].toString(),
+  //             Icons.school_outlined,
+  //             AppTheme.info,
+  //           ),
+  //           _buildStatCard(
+  //             'Preguntas Creadas',
+  //             _overallStats!['totalQuestions'].toString(),
+  //             Icons.quiz_outlined,
+  //             AppTheme.success,
+  //           ),
+  //           _buildStatCard(
+  //             'Respuestas Totales',
+  //             _overallStats!['totalAnswers'].toString(),
+  //             Icons.question_answer_outlined,
+  //             AppTheme.warning,
+  //           ),
+  //           _buildStatCard(
+  //             'Precisión Promedio',
+  //             '${_overallStats!['averageAccuracy']}%',
+  //             Icons.trending_up_outlined,
+  //             AppTheme.primaryRed,
+  //           ),
+  //         ],
+  //       ),
+  //     ],
+  //   );
+  // }
 
   Widget _buildStudentsCard() {
     final total = _overallStats?['totalStudents'] ?? '—';
@@ -342,94 +341,63 @@ class _StatisticsScreenState extends State<StatisticsScreen>
     );
   }
 
-  Widget _buildCategoryStats() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Rendimiento por Categoría',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: AppTheme.white,
-                fontWeight: FontWeight.w600,
-              ),
-        ),
-        const SizedBox(height: 16),
-        Container(
-          decoration: BoxDecoration(
-            color: AppTheme.lightBlack,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: AppTheme.greyDark.withOpacity(0.3),
-              width: 1,
-            ),
-          ),
-          child: ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(16),
-            itemCount: _categoryStats.length,
-            separatorBuilder: (context, index) => const Divider(
-              color: AppTheme.greyDark,
-              height: 24,
-            ),
-            itemBuilder: (context, index) {
-              final category = _categoryStats[index];
-              return Row(
-                children: [
-                  Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      color: category['color'],
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          category['name'],
-                          style: const TextStyle(
-                            color: AppTheme.white,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        Text(
-                          '${category['questions']} preguntas • ${category['answers']} respuestas',
-                          style: const TextStyle(
-                            color: AppTheme.greyLight,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: category['color'].withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '${category['accuracy']}%',
-                      style: TextStyle(
-                        color: category['color'],
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
+  // Widget _buildCategoryStats() {
+  //   return Column(
+  //     crossAxisAlignment: CrossAxisAlignment.start,
+  //     children: [
+  //       Text(
+  //         'Rendimiento por Categoría',
+  //         style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+  //               color: AppTheme.white,
+  //               fontWeight: FontWeight.w600,
+  //             ),
+  //       ),
+  //       const SizedBox(height: 16),
+  //       ListView.builder(
+  //         shrinkWrap: true,
+  //         physics: const NeverScrollableScrollPhysics(),
+  //         itemCount: _categoryStats.length,
+  //         itemBuilder: (context, index) {
+  //           final category = _categoryStats[index];
+  //           return Card(
+  //             color: category['color'],
+  //             child: Padding(
+  //               padding: const EdgeInsets.all(16),
+  //               child: Row(
+  //                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  //                 children: [
+  //                   Column(
+  //                     crossAxisAlignment: CrossAxisAlignment.start,
+  //                     children: [
+  //                       Text(
+  //                         category['name'] ?? 'Sin categoría',
+  //                         style: const TextStyle(
+  //                           color: AppTheme.white,
+  //                           fontWeight: FontWeight.bold,
+  //                         ),
+  //                       ),
+  //                       Text(
+  //                         '${category['questions'] ?? 0} preguntas, ${category['answers'] ?? 0} respuestas',
+  //                         style: const TextStyle(color: AppTheme.white),
+  //                       ),
+  //                     ],
+  //                   ),
+  //                   Text(
+  //                     '${category['accuracy']?.toStringAsFixed(2) ?? '0'}%',
+  //                     style: const TextStyle(
+  //                       color: AppTheme.white,
+  //                       fontWeight: FontWeight.bold,
+  //                     ),
+  //                   ),
+  //                 ],
+  //               ),
+  //             ),
+  //           );
+  //         },
+  //       ),
+  //     ],
+  //   );
+  // }
 
   Widget _buildTopStudents() {
     return Column(

@@ -8,7 +8,6 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/models/question_models.dart';
 import '../widgets/question_card.dart';
-import '../widgets/filter_chip_widget.dart';
 
 class QuestionsListScreen extends StatefulWidget {
   const QuestionsListScreen({Key? key}) : super(key: key);
@@ -243,72 +242,111 @@ class _QuestionsListScreenState extends State<QuestionsListScreen>
           ),
           const SizedBox(height: 16),
 
-          // 📌 2 columnas: Categorías y Tipos
+          // 📌 Filtros: Categoría y Tipo
           Row(
             children: [
-              // 👉 Columna categorías
+              // 👉 Filtro por categoría
               Expanded(
-                child: Container(
-                  height: 120, // 🔥 ajusta altura visible
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Scrollbar(
-                    thumbVisibility: true,
-                    child: ListView(
-                      children: [
-                        FilterChipWidget(
-                          label: 'Todas',
-                          isSelected: _selectedCategory == 'Todas',
-                          onSelected: (selected) {
-                            setState(() => _selectedCategory = 'Todas');
-                            _filterQuestions();
-                          },
-                        ),
-                        ..._categories.map((cat) {
-                          return Padding(
-                            padding: const EdgeInsets.only(top: 6),
-                            child: FilterChipWidget(
-                              label: cat.name,
-                              isSelected: _selectedCategory == cat.name,
-                              onSelected: (selected) {
-                                setState(() => _selectedCategory = cat.name);
-                                _filterQuestions();
-                              },
-                            ),
-                          );
-                        }).toList(),
-                      ],
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Categoría',
+                      style: TextStyle(
+                        color: AppTheme.white,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      decoration: BoxDecoration(
+                        color: AppTheme.lightBlack,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppTheme.greyMedium),
+                      ),
+                      child: DropdownButton<String>(
+                        value: _selectedCategory,
+                        onChanged: (String? newValue) {
+                          if (newValue != null) {
+                            setState(() {
+                              _selectedCategory = newValue;
+                              _filterQuestions();
+                            });
+                          }
+                        },
+                        items: [
+                          DropdownMenuItem(
+                            value: 'Todas',
+                            child: Text('Todas',
+                                style: TextStyle(color: AppTheme.white)),
+                          ),
+                          ..._categories.map((category) {
+                            return DropdownMenuItem(
+                              value: category.name,
+                              child: Text(category.name,
+                                  style: TextStyle(color: AppTheme.white)),
+                            );
+                          }).toList(),
+                        ],
+                        dropdownColor: AppTheme.lightBlack,
+                        style: const TextStyle(color: AppTheme.white),
+                        icon: const Icon(Icons.arrow_drop_down,
+                            color: AppTheme.white),
+                        underline: const SizedBox(),
+                      ),
+                    ),
+                  ],
                 ),
               ),
 
               const SizedBox(width: 12),
 
-              // 👉 Columna tipos
+              // 👉 Filtro por tipo
               Expanded(
-                child: Container(
-                  height: 120, // 🔥 igual altura
-                  padding: const EdgeInsets.only(left: 8),
-                  child: Scrollbar(
-                    thumbVisibility: true,
-                    child: ListView(
-                      children: _types.map((type) {
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 6),
-                          child: FilterChipWidget(
-                            label: type,
-                            isSelected: _selectedType == type,
-                            onSelected: (selected) {
-                              setState(() {
-                                _selectedType = type;
-                              });
-                              _filterQuestions();
-                            },
-                          ),
-                        );
-                      }).toList(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Tipo',
+                      style: TextStyle(
+                        color: AppTheme.white,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      decoration: BoxDecoration(
+                        color: AppTheme.lightBlack,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppTheme.greyMedium),
+                      ),
+                      child: DropdownButton<String>(
+                        value: _selectedType,
+                        onChanged: (String? newValue) {
+                          if (newValue != null) {
+                            setState(() {
+                              _selectedType = newValue;
+                              _filterQuestions();
+                            });
+                          }
+                        },
+                        items: _types.map((type) {
+                          return DropdownMenuItem(
+                            value: type,
+                            child: Text(type,
+                                style: TextStyle(color: AppTheme.white)),
+                          );
+                        }).toList(),
+                        dropdownColor: AppTheme.lightBlack,
+                        style: const TextStyle(color: AppTheme.white),
+                        icon: const Icon(Icons.arrow_drop_down,
+                            color: AppTheme.white),
+                        underline: const SizedBox(),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -321,6 +359,7 @@ class _QuestionsListScreenState extends State<QuestionsListScreen>
   Widget _buildQuestionsList() {
     return AnimationLimiter(
       child: ListView.builder(
+        primary: false,
         padding: const EdgeInsets.all(16),
         itemCount: _filteredQuestions.length,
         itemBuilder: (context, index) {
@@ -338,8 +377,7 @@ class _QuestionsListScreenState extends State<QuestionsListScreen>
                     onEdit: () {
                       Navigator.of(context).pushNamed(
                         AppConstants.editQuestionRoute,
-                        arguments: _filteredQuestions[index]
-                            .id, // 👈 ahora sí es un String
+                        arguments: _filteredQuestions[index].id,
                       );
                     },
                     onDelete: () {

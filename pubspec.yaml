@@ -12,6 +12,7 @@ dependencies:
   flutter:
     sdk: flutter
 
+  auto_size_text: ^3.0.0
   supabase_flutter: ^2.3.4
   flutter_dotenv: ^5.0.2
   image_picker: ^1.1.2

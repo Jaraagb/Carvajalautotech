@@ -34,9 +34,13 @@ class CategoryService {
     try {
       final response = await _client
           .from('categories')
-          .select()
+          .select(
+              '*, question_count:category_question_count(question_count), student_count:category_student_count(student_count)')
           .eq('is_active', true)
           .order('created_at', ascending: false);
+
+      print('✅ Categorías activas obtenidas:');
+      print(response);
 
       return (response as List)
           .map((json) => Category.fromJson(Map<String, dynamic>.from(json)))
@@ -52,8 +56,12 @@ class CategoryService {
     try {
       final response = await _client
           .from('categories')
-          .select()
+          .select(
+              '*, question_count:category_question_count(question_count), student_count:category_student_count(student_count)')
           .order('created_at', ascending: false);
+
+      print('✅ Todas las categorías obtenidas:');
+      print(response);
 
       return (response as List)
           .map((json) => Category.fromJson(Map<String, dynamic>.from(json)))
@@ -108,6 +116,48 @@ class CategoryService {
     } catch (e) {
       print('❌ Error eliminando categoría: $e');
       return false;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchCategoriesWithProgress(
+      String studentId) async {
+    try {
+      final client = Supabase.instance.client;
+
+      print(
+          '🔍 Iniciando consulta para progreso del estudiante con ID: $studentId');
+
+      // Consulta para obtener el progreso del estudiante en cada categoría
+      final response = await client.rpc('get_student_progress', params: {
+        'student_id': studentId,
+      });
+
+      print('✅ Respuesta de la base de datos: $response');
+
+      if (response == null || response.isEmpty) {
+        print(
+            '⚠️ No se encontraron categorías con progreso para el estudiante.');
+        return [];
+      }
+
+      // Procesar los datos obtenidos
+      final categoriesWithProgress = (response as List).map((item) {
+        print('🔹 Procesando categoría: $item');
+        return {
+          'id': item['category_id'],
+          'name': item['category_name'] ?? 'Sin nombre',
+          'description': item['category_description'] ?? 'Sin descripción',
+          'questionCount': item['total_questions'] ?? 0,
+          'completed': item['answered_questions'] ?? 0,
+        };
+      }).toList();
+
+      print('✅ Categorías procesadas con progreso: $categoriesWithProgress');
+
+      return categoriesWithProgress;
+    } catch (e) {
+      print("❌ Error cargando categorías con progreso: $e");
+      return [];
     }
   }
 }
