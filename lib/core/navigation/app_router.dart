@@ -1,3 +1,4 @@
+import 'package:carvajal_autotech/features/auth/presentation/screens/request_password_recovery_email_screen.dart';
 import 'package:flutter/material.dart';
 import '../constants/app_constants.dart';
 import '../../features/splash/presentation/splash_screen.dart';
@@ -34,7 +35,8 @@ class AppRouter {
         return _buildRoute(const StudentRegisterScreen(), settings);
 
       case AppConstants.forgotPasswordRoute:
-        return _buildRoute(const SimpleResetPasswordScreen(), settings);
+        return _buildRoute(
+            const RequestPasswordRecoveryEmailScreen(), settings);
 
       case AppConstants.resetPasswordRoute:
         return _buildRoute(const SimpleResetPasswordScreen(), settings);
